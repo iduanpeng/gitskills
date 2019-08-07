@@ -2,10 +2,7 @@ package com.iduanpeng.lambda;
 
 import com.iduanpeng.design.factory.abstractfactory.User;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -109,6 +106,26 @@ public class LambdaTest {
         List<Integer> list8 = Arrays.asList(1,2,3,4,5,6,7);
         int sum1 = list8.stream().map(x -> x * x).reduce((x,y) -> x + y).get();
         System.out.println(sum1);
+
+
+        /**
+         * 补充 grouping by
+         */
+        List<Person> people = new ArrayList<>();
+        people.add(new Person(1,"1"));
+        people.add(new Person(2,"2"));
+        Map<Integer,List<Person>> group = people.stream()
+                .collect(Collectors.groupingBy(x -> x.getId()));
+
+        /**
+         * 补充 list 转 map
+         */
+        Map<Integer, String> map = people.stream().collect(Collectors.
+                toMap((key -> key.getId()), (value -> value.getName())));
+        map.forEach((key,value) -> {
+            System.out.println(key + "-" + value);
+        });
+
 
 
     }
