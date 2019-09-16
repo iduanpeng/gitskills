@@ -2,9 +2,10 @@ package com.iduanpeng.examples;
 
 import org.apache.commons.compress.utils.Lists;
 
+import java.io.Serializable;
 import java.util.List;
 
-public class PeopleData {
+public class PeopleData implements Serializable {
 
     private Integer tableId;
 

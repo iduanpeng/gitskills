@@ -20,4 +20,10 @@ public class People {
     private String nl;
 
     private String mzdm;
+
+    public People(String tableName,String zjhm, String xm) {
+        this.tableName = tableName;
+        this.zjhm = zjhm;
+        this.xm = xm;
+    }
 }

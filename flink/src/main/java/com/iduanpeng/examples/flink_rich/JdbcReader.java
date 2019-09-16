@@ -22,35 +22,36 @@ public class JdbcReader {
 
     public void open() throws Exception {
         connection = getConnection();
-        String sql1 = "select * from table_b";
-        String sql2 = "select * from table_c";
+        String sql1 = "select * from aaa";
+        String sql2 = "select * from bbb";
         ps1 = this.connection.prepareStatement(sql1);
         ps2 = this.connection.prepareStatement(sql2);
     }
 
 
     public List<People> run() throws Exception {
+        //先获取主数据建模的信息
+        //1、来源表信息
+        //2、来源表与主数据字段关联信息
+        //3、查询
+
         List<People> data = Lists.newArrayList();
         ResultSet resultSet1 = ps1.executeQuery();
         ResultSet resultSet2 = ps2.executeQuery();
         while(resultSet1.next()){
                 People people = new People(
-                                            "b",
+                                            "aaa",
                                             resultSet1.getString("ZJHM"),
-                                           resultSet1.getString("XM"),
-                                            resultSet1.getString("XB"),
-                                            resultSet1.getString("NL"),
-                                            resultSet1.getString("MZDM"));
+                                            resultSet1.getString("XM")
+                                            );
+
             data.add(people);
         }
         while(resultSet2.next()){
             People people = new People(
-                    "c",
+                    "bbb",
                     resultSet2.getString("ZJHM"),
-                    resultSet2.getString("XM"),
-                    resultSet2.getString("XB"),
-                    resultSet2.getString("NL"),
-                    resultSet2.getString("MZDM")
+                    resultSet2.getString("XM")
 
             );
             data.add(people);
@@ -76,7 +77,7 @@ public class JdbcReader {
         Connection connection = null;
         try {
             Class.forName("com.mysql.jdbc.Driver");
-            connection = DriverManager.getConnection("jdbc:mysql://172.18.71.155:4000/mdmtest","root","");
+            connection = DriverManager.getConnection("jdbc:mysql://172.18.118.222:3306/test","root","root");
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } finally {
