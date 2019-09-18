@@ -17,7 +17,7 @@ public class PeopleData implements Serializable {
 
     private String birth;
 
-    public PeopleData(Integer tableId,String idCard, String name, Integer age, String birth) {
+    public PeopleData(Integer tableId, String idCard, String name, Integer age, String birth) {
         this.tableId = tableId;
         this.idCard = idCard;
         this.name = name;
@@ -28,18 +28,18 @@ public class PeopleData implements Serializable {
     public PeopleData() {
     }
 
-    public static List<PeopleData> getMockPeopleList(){
+    public static List<PeopleData> getMockPeopleList() {
         List<PeopleData> data = Lists.newArrayList();
         //name 选取table2  age 选取 table1 birth 选取 table2
-        PeopleData p1 = new PeopleData(1,"111","小明",25,"1995");
-        PeopleData p2 = new PeopleData(2,"111","小鹏",18,"1990");
+        PeopleData p1 = new PeopleData(1, "111", "小明", 25, "1995");
+        PeopleData p2 = new PeopleData(2, "111", "小鹏", 18, "1990");
 
-        PeopleData p3 = new PeopleData(1,"222","小丽",25,"1995");
-        PeopleData p4 = new PeopleData(2,"222","小莉",23,"1995");
+        PeopleData p3 = new PeopleData(1, "222", "小丽", 25, "1995");
+        PeopleData p4 = new PeopleData(2, "222", "小莉", 23, "1995");
         data.add(p1);
-        data.add(p1);
-        data.add(p1);
-        data.add(p1);
+        data.add(p2);
+        data.add(p3);
+        data.add(p4);
         return data;
     }
 

@@ -22,8 +22,8 @@ public class JdbcReader {
 
     public void open() throws Exception {
         connection = getConnection();
-        String sql1 = "select * from aaa";
-        String sql2 = "select * from bbb";
+        String sql1 = "select * from table_a";
+        String sql2 = "select * from table_b";
         ps1 = this.connection.prepareStatement(sql1);
         ps2 = this.connection.prepareStatement(sql2);
     }
@@ -38,20 +38,26 @@ public class JdbcReader {
         List<People> data = Lists.newArrayList();
         ResultSet resultSet1 = ps1.executeQuery();
         ResultSet resultSet2 = ps2.executeQuery();
-        while(resultSet1.next()){
-                People people = new People(
-                                            "aaa",
-                                            resultSet1.getString("ZJHM"),
-                                            resultSet1.getString("XM")
-                                            );
+        while (resultSet1.next()) {
+            People people = new People(
+                    "table_a",
+                    resultSet1.getString("ZJHM"),
+                    resultSet1.getString("XM"),
+                    resultSet1.getString("XB"),
+                    resultSet1.getString("NL"),
+                    resultSet1.getString("MZDM")
+            );
 
             data.add(people);
         }
-        while(resultSet2.next()){
+        while (resultSet2.next()) {
             People people = new People(
-                    "bbb",
+                    "table_b",
                     resultSet2.getString("ZJHM"),
-                    resultSet2.getString("XM")
+                    resultSet2.getString("XM"),
+                    resultSet2.getString("XB"),
+                    resultSet2.getString("NL"),
+                    resultSet2.getString("MZDM")
 
             );
             data.add(people);
@@ -60,24 +66,23 @@ public class JdbcReader {
     }
 
     public void close() throws Exception {
-        if (connection != null){
+        if (connection != null) {
             connection.close();
         }
-        if (ps1 != null){
+        if (ps1 != null) {
             connection.close();
         }
-        if (ps2 != null){
+        if (ps2 != null) {
             connection.close();
         }
     }
 
 
-
-    public static Connection getConnection() throws Exception{
+    public static Connection getConnection() throws Exception {
         Connection connection = null;
         try {
             Class.forName("com.mysql.jdbc.Driver");
-            connection = DriverManager.getConnection("jdbc:mysql://172.18.118.222:3306/test","root","root");
+            connection = DriverManager.getConnection("jdbc:mysql://172.18.71.155:4000/mdmtest", "root", "");
         } catch (ClassNotFoundException e) {
             e.printStackTrace();
         } finally {
@@ -85,7 +90,7 @@ public class JdbcReader {
         return connection;
     }
 
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) throws Exception {
         Connection connection = getConnection();
         System.out.println(connection);
     }

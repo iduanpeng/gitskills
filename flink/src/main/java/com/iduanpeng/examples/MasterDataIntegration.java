@@ -5,6 +5,7 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.operators.UnsortedGrouping;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import java.util.List;
 
@@ -13,7 +14,7 @@ import java.util.List;
  */
 public class MasterDataIntegration {
 
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) throws Exception {
         //jdbc 并行 读取源数据 此处先mock数据
 
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
@@ -38,21 +39,21 @@ public class MasterDataIntegration {
             public PeopleData reduce(PeopleData peopleData, PeopleData t1) throws Exception {
                 //根据字段的权重 选取
                 PeopleData peopleData1 = new PeopleData();
-                if (peopleData.getTableId().equals(1)){
+                if (peopleData.getTableId().equals(1)) {
                     peopleData1.setAge(peopleData.getAge());
-                } else if (t1.getTableId().equals(1)){
+                } else if (t1.getTableId().equals(1)) {
                     peopleData1.setAge(t1.getAge());
                 }
                 peopleData1.setName(peopleData.getName());
-                if (peopleData.getTableId().equals(2)){
+                if (peopleData.getTableId().equals(2)) {
                     peopleData1.setName(peopleData.getName());
-                } else if (t1.getTableId().equals(2)){
+                } else if (t1.getTableId().equals(2)) {
                     peopleData1.setName(t1.getName());
                 }
 
-                if (peopleData.getTableId().equals(3)){
+                if (peopleData.getTableId().equals(3)) {
                     peopleData1.setBirth(peopleData.getBirth());
-                } else if (t1.getTableId().equals(3)){
+                } else if (t1.getTableId().equals(3)) {
                     peopleData1.setBirth(t1.getBirth());
                 }
                 peopleData1.setTableId(1);
@@ -60,6 +61,8 @@ public class MasterDataIntegration {
                 return peopleData1;
             }
         }).print();
+
+
     }
 
 }

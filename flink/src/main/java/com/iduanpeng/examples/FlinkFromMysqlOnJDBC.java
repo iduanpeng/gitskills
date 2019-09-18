@@ -14,50 +14,41 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import java.util.List;
 
 public class FlinkFromMysqlOnJDBC {
-    public static void main(String[] args) throws Exception{
+    public static void main(String[] args) throws Exception {
         JdbcReader jdbcReader = new JdbcReader();
         jdbcReader.open();
         List<People> run = jdbcReader.run();
 
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
+        //获取统一的数据
+        //根据主数据建模中的 字段 关联源数据表的查询 获取到
         DataSource<People> peopleDataSource = env.fromCollection(run);
+        //根据唯一键 分组
         peopleDataSource.groupBy(new KeySelector<People, String>() {
             @Override
             public String getKey(People people) throws Exception {
                 return people.getZjhm();
             }
-        }).reduce(new ReduceFunction<People>() {
-            @Override
-            public People reduce(People people, People t1) throws Exception {
-                People result = new People(people.getTableName(),
-                        people.getZjhm(),
-                        people.getXm()
+        })
+                //聚合操作
+                //1 单值 根据权重覆盖
+                //2 多值 累积
+                .reduce(new ReduceFunction<People>() {
+                    @Override
+                    public People reduce(People people, People t1) throws Exception {
+                        People result = new People(people.getTableName(),
+                                people.getZjhm(),
+                                people.getXm()
                         );
-                //年龄取table_c 的数据
-                //可以加上权重，每次遇到权重大的 直接覆盖
-                if (t1.getTableName().equals("bbb")){
-                    people.setXm(t1.getXm());
-                }
-                return people;
-            }
-        }).print();
-        //sink 数据落地到哪里
-
-        //flink 自带
-//        StreamExecutionEnvironment streamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment();
-//        DataStreamSource<People> peopleDataStreamSource =
-//                streamExecutionEnvironment.addSource(new Reader()).setParallelism(3);
-//        peopleDataSource.groupBy(new KeySelector<People, String>() {
-//            @Override
-//            public String getKey(People people) throws Exception {
-//                return people.getZjhm();
-//            }
-//        }).reduce(new ReduceFunction<People>() {
-//            @Override
-//            public People reduce(People people, People t1) throws Exception {
-//                return null;
-//            }
-//        });
+                        //姓名取table_b 的数据
+                        //可以加上权重，每次遇到权重大的 直接覆盖
+                        if (t1.getTableName().equals("table_b")) {
+                            result.setXm(t1.getXm());
+                        }
+                        return result;
+                    }
+                }).print();
+        //sink 数据落地
 
     }
 }
