@@ -9,6 +9,7 @@ import org.apache.flink.api.java.io.jdbc.JDBCOutputFormat;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.operators.MapOperator;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.types.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,8 @@ import org.slf4j.LoggerFactory;
  */
 public class App {
     public static final Logger LOGGER = LoggerFactory.getLogger(App.class);
-    public static void main(String[] args) {
+
+    public static void main(String[] args) throws Exception{
         //字段权重顺序
         // priority     3       2      1
         // name      table3 table2 table1
@@ -109,36 +111,38 @@ public class App {
         });
 
         map1.union(map2).union(map3)
-                .groupBy((student) ->{
+                .groupBy((student) -> {
                     return student.getGmsfhm();
-                }).reduce((s1,s2) -> {
-                    if (s2.getNamePriority() > s1.getNamePriority()
-                            && s2.getName() != null){
-                        s1.setNamePriority(s2.getNamePriority());
-                        s1.setName(s2.getName());
-                    }
-                    if (s2.getXbPriority() > s1.getXbPriority()
-                            &&  s2.getXb() != null){
-                        s1.setXbPriority(s2.getXbPriority());
-                        s1.setXb(s2.getXb());
-                    }
-                    if (s1.getAddress() != null
-                            && !(s1.getAddress().equals(s2.getAddress()))){
-                        s1.setAddress(s1.getAddress() + "-" + s2.getAddress());
-                    } else {
-                        if (s2.getAddress() != null){
-                            s1.setAddress(s2.getAddress());
-                        }
-                    }
-                    return s1;
-        }).map((student) -> {
+                }).reduce((s1, s2) -> {
+            if (s2.getNamePriority() > s1.getNamePriority()
+                    && s2.getName() != null) {
+                s1.setNamePriority(s2.getNamePriority());
+                s1.setName(s2.getName());
+            }
+            if (s2.getXbPriority() > s1.getXbPriority()
+                    && s2.getXb() != null) {
+                s1.setXbPriority(s2.getXbPriority());
+                s1.setXb(s2.getXb());
+            }
+            if (s1.getAddress() != null
+                    && !(s1.getAddress().equals(s2.getAddress()))) {
+                s1.setAddress(s1.getAddress() + "-" + s2.getAddress());
+            } else {
+                if (s2.getAddress() != null) {
+                    s1.setAddress(s2.getAddress());
+                }
+            }
+            return s1;
+        })
+                .map((student) -> {
             Row row = new Row(4);
-            row.setField(0,student.getGmsfhm());
-            row.setField(1,student.getName());
-            row.setField(2,student.getXb());
-            row.setField(3,student.getAddress());
+            row.setField(0, student.getGmsfhm());
+            row.setField(1, student.getName());
+            row.setField(2, student.getXb());
+            row.setField(3, student.getAddress());
             return row;
-        });
-//                .output(outputFormat);
+        })
+//                .print();
+        .output(outputFormat);
     }
 }
