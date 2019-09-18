@@ -58,5 +58,11 @@ public class FlinkFromMysqlOnDataSet {
 //                return null;
 //            }
 //        }).print();
+        input.map(new MapFunction<Row, Object>() {
+            @Override
+            public Object map(Row row) throws Exception {
+                return null;
+            }
+        });
     }
 }
