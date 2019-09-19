@@ -66,7 +66,7 @@
         <!--<logger name="org.apache" level="ERROR"/>-->
         <!--<logger name="com.zaxxer" level="ERROR"/>-->
         <!--<logger name="org.mybatis" level="INFO"/>-->
-        <root level="all">
+        <root level="info">
             <appender-ref ref="Console"/>
             <appender-ref ref="RollingFileInfo"/>
             <appender-ref ref="RollingFileWarn"/>

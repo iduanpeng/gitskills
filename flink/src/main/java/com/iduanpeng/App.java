@@ -1,18 +1,23 @@
 package com.iduanpeng;
 
 import com.iduanpeng.dal.entity.Student;
+import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.apache.flink.api.java.io.jdbc.JDBCInputFormat;
 import org.apache.flink.api.java.io.jdbc.JDBCOutputFormat;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.operators.MapOperator;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.types.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.sql.Types;
+import java.util.Date;
 
 /**
  * flink 测试程序入口类
@@ -72,77 +77,97 @@ public class App {
                 .setDBUrl("jdbc:mysql://172.18.71.155:4000/founder")
                 .setUsername("root")
                 .setPassword("")
-                .setQuery("insert into flink_result (gmsfhm,name,xb,address) values(?,?,?,?)")
+                .setQuery("insert into flink_result (gmsfhm,name,xb,address) values (?,?,?,?)")
                 .finish();
 
         ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
-        DataSource<Row> input1 = env.createInput(table1).setParallelism(3);
-        DataSource<Row> input2 = env.createInput(table2).setParallelism(3);
-        DataSource<Row> input3 = env.createInput(table3).setParallelism(3);
+        env.setParallelism(5);
+        DataSource<Row> input1 = env.createInput(table1);
+        DataSource<Row> input2 = env.createInput(table2);
+        DataSource<Row> input3 = env.createInput(table3);
+        LOGGER.info("input time is {}",new Date());
         //map reduce
-        MapOperator<Row, Student> map1 = input1.map((row) -> {
-            return new Student("table1",
-                    (String) row.getField(0),
-                    (String) row.getField(1),
-                    (String) row.getField(2),
-                    (String) row.getField(3),
-                    1,
-                    2);
+        MapOperator<Row, Student> map1 = input1.map(new MapFunction<Row, Student>() {
+            @Override
+            public Student map(Row row) throws Exception {
+                return new Student("table1",
+                        (String) row.getField(0),
+                        (String) row.getField(1),
+                        (String) row.getField(2),
+                        (String) row.getField(3),
+                        1,
+                        2);
+            }
         });
 
-        MapOperator<Row, Student> map2 = input2.map((row) -> {
-            return new Student("table2",
-                    (String) row.getField(0),
-                    (String) row.getField(1),
-                    (String) row.getField(2),
-                    (String) row.getField(3),
-                    2,
-                    3);
+        MapOperator<Row, Student> map2 = input2.map(new MapFunction<Row, Student>() {
+            @Override
+            public Student map(Row row) throws Exception {
+                return new Student("table2",
+                        (String) row.getField(0),
+                        (String) row.getField(1),
+                        (String) row.getField(2),
+                        (String) row.getField(3),
+                        2,
+                        3);
+            }
         });
 
-        MapOperator<Row, Student> map3 = input3.map((row) -> {
-            return new Student("table3",
-                    (String) row.getField(0),
-                    (String) row.getField(1),
-                    (String) row.getField(2),
-                    (String) row.getField(3),
-                    3,
-                    3);
+        MapOperator<Row, Student> map3 = input3.map(new MapFunction<Row, Student>() {
+            @Override
+            public Student map(Row row) throws Exception {
+                return new Student("table3",
+                        (String) row.getField(0),
+                        (String) row.getField(1),
+                        (String) row.getField(2),
+                        (String) row.getField(3),
+                        3,
+                        3);
+            }
         });
-
+        LOGGER.info("map stop time is {}",new Date());
         map1.union(map2).union(map3)
-                .groupBy((student) -> {
-                    return student.getGmsfhm();
-                }).reduce((s1, s2) -> {
-            if (s2.getNamePriority() > s1.getNamePriority()
-                    && s2.getName() != null) {
-                s1.setNamePriority(s2.getNamePriority());
-                s1.setName(s2.getName());
-            }
-            if (s2.getXbPriority() > s1.getXbPriority()
-                    && s2.getXb() != null) {
-                s1.setXbPriority(s2.getXbPriority());
-                s1.setXb(s2.getXb());
-            }
-            if (s1.getAddress() != null
-                    && !(s1.getAddress().equals(s2.getAddress()))) {
-                s1.setAddress(s1.getAddress() + "-" + s2.getAddress());
-            } else {
-                if (s2.getAddress() != null) {
-                    s1.setAddress(s2.getAddress());
+                .groupBy(new KeySelector<Student, String>() {
+                    @Override
+                    public String getKey(Student student) throws Exception {
+                        return student.getGmsfhm();
+                    }
+                }).reduce(new ReduceFunction<Student>() {
+            @Override
+            public Student reduce(Student s1, Student s2) throws Exception {
+                if (s2.getNamePriority() > s1.getNamePriority()
+                        && s2.getName() != null) {
+                    s1.setNamePriority(s2.getNamePriority());
+                    s1.setName(s2.getName());
                 }
+                if (s2.getXbPriority() > s1.getXbPriority()
+                        && s2.getXb() != null) {
+                    s1.setXbPriority(s2.getXbPriority());
+                    s1.setXb(s2.getXb());
+                }
+                if (s1.getAddress() != null
+                        && !(s1.getAddress().equals(s2.getAddress()))) {
+                    s1.setAddress(s1.getAddress() + "-" + s2.getAddress());
+                } else {
+                    if (s2.getAddress() != null) {
+                        s1.setAddress(s2.getAddress());
+                    }
+                }
+                return s1;
             }
-            return s1;
         })
-                .map((student) -> {
-            Row row = new Row(4);
-            row.setField(0, student.getGmsfhm());
-            row.setField(1, student.getName());
-            row.setField(2, student.getXb());
-            row.setField(3, student.getAddress());
-            return row;
-        })
+                .map(new MapFunction<Student, Row>() {
+                    @Override
+                    public Row map(Student student) throws Exception {
+                        Row row = new Row(4);
+                        row.setField(0, student.gmsfhm);
+                        row.setField(1, student.getName());
+                        row.setField(2, student.getXb());
+                        row.setField(3, student.getAddress());
+                        return row;
+                    }
+                }).output(outputFormat);
 //                .print();
-        .output(outputFormat);
+                env.execute();
     }
 }
