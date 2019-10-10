@@ -12,6 +12,7 @@ import org.apache.flink.api.java.io.jdbc.JDBCOutputFormat;
 import org.apache.flink.api.java.operators.DataSource;
 import org.apache.flink.api.java.operators.MapOperator;
 import org.apache.flink.api.java.typeutils.RowTypeInfo;
+import org.apache.flink.core.io.InputSplit;
 import org.apache.flink.types.Row;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +54,7 @@ public class App {
                 .setRowTypeInfo(rowTypeInfo)
                 .setQuery("select * from G_CZRKXX_1")
                 .finish();
-
+        LOGGER.info("table1 in time is{}",new Date());
         JDBCInputFormat table2 = JDBCInputFormat.buildJDBCInputFormat()
                 .setDrivername("com.mysql.jdbc.Driver")
                 .setDBUrl("jdbc:mysql://172.18.71.155:4000/founder")
@@ -62,7 +63,7 @@ public class App {
                 .setRowTypeInfo(rowTypeInfo)
                 .setQuery("select * from G_RKXX_2")
                 .finish();
-
+        LOGGER.info("table2 in time is{}",new Date());
         JDBCInputFormat table3 = JDBCInputFormat.buildJDBCInputFormat()
                 .setDrivername("com.mysql.jdbc.Driver")
                 .setDBUrl("jdbc:mysql://172.18.71.155:4000/founder")
@@ -71,6 +72,7 @@ public class App {
                 .setRowTypeInfo(rowTypeInfo)
                 .setQuery("select * from G_RYJBXX_3")
                 .finish();
+        LOGGER.info("table3 in time is{}",new Date());
         //sink source
         JDBCOutputFormat outputFormat = JDBCOutputFormat.buildJDBCOutputFormat()
                 .setDrivername("com.mysql.jdbc.Driver")
@@ -85,7 +87,7 @@ public class App {
         DataSource<Row> input1 = env.createInput(table1);
         DataSource<Row> input2 = env.createInput(table2);
         DataSource<Row> input3 = env.createInput(table3);
-        LOGGER.info("input time is {}",new Date());
+
         //map reduce
         MapOperator<Row, Student> map1 = input1.map(new MapFunction<Row, Student>() {
             @Override
@@ -125,7 +127,7 @@ public class App {
                         3);
             }
         });
-        LOGGER.info("map stop time is {}",new Date());
+        LOGGER.info("map finish time is {}",new Date());
         map1.union(map2).union(map3)
                 .groupBy(new KeySelector<Student, String>() {
                     @Override
