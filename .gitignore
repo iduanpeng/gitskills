@@ -1,7 +1,5 @@
 ##ignore this file
 /target/
-/flink/target/
-/spark/target/
 /src/test/
 .idea
 .project
