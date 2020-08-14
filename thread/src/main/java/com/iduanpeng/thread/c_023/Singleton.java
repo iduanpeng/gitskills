@@ -6,7 +6,7 @@
  * 更好的是采用下面的方式，既不用加锁，也能实现懒加载
  *
  */
-package yxxy.c_023;
+package com.iduanpeng.thread.c_023;
 
 import java.util.Arrays;
 
