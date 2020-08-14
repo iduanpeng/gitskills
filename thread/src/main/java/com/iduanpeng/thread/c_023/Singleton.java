@@ -28,7 +28,8 @@ public class Singleton {
 		Thread[] ths = new Thread[200];
 		for(int i=0; i<ths.length; i++) {
 			ths[i] = new Thread(()->{
-				Singleton.getSingle();
+				Singleton single = Singleton.getSingle();
+				System.out.println(single);
 			});
 		}
 
