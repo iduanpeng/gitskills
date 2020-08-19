@@ -46,9 +46,9 @@ public class ReentrantLock4 {
 				lock.lockInterruptibly(); //t1 不结束 t2 阻塞在这里 调用 t2.interrupt()可以对interrupt()方法做出响应
 				System.out.println("t2 start");
 				//TimeUnit.SECONDS.sleep(5);
-				for (int i = 0;i< 10000;i++){
-					System.out.println(i);
-				}
+//				for (int i = 0;i< 10000;i++){
+//					System.out.println(i);
+//				}
 				System.out.println("t2 end");
 			} catch (InterruptedException e) {
 				System.out.println("interrupted!");
