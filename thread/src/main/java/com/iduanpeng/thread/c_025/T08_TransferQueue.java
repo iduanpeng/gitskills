@@ -14,9 +14,9 @@ public class T08_TransferQueue {
 			}
 		}).start();*/
 		
-		//strs.transfer("aaa");
+		strs.transfer("aaa");//找不到消费者的话 会阻塞在这里
 		
-		strs.put("aaa");
+		//strs.put("aaa");
 		
 
 		new Thread(() -> {
@@ -26,5 +26,6 @@ public class T08_TransferQueue {
 				e.printStackTrace();
 			}
 		}).start();
+		//strs.transfer("aaa");//先启动消费者 后启动生产者 不阻塞
 	}
 }

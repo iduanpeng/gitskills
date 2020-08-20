@@ -16,7 +16,7 @@ public class T09_SynchronusQueue { //容量为0
 		}).start();
 
 		strs.put("aaa"); //阻塞等待消费者消费
-		//strs.add("aaa");
+		//strs.add("aaa");//不能调用add（报错）  只能调用put阻塞 等待消费
 		System.out.println(strs.size());
 	}
 }
