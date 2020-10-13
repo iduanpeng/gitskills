@@ -17,6 +17,7 @@
         <module>design</module>
         <module>lambda</module>
         <module>thread</module>
+        <module>shell</module>
     </modules>
     <dependencyManagement>
     <dependencies>
