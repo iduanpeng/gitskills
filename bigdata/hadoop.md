@@ -25,7 +25,7 @@ export JAVA_HOME HADOOP_HOME PATH
 ```  
 
 * `hadoop namenode -format`格式化生成路径  
-![格式化图片](../img/namenode-format.png)
+![格式化图片](./img/namenode-format.png)
 * `hadoop-daemon.sh start namenode` web 访问 `ip:50070` 可以验证namenode是否启动成功
 
 * yarn配置 `yarn-site.xml`
