@@ -18,6 +18,7 @@
         <module>lambda</module>
         <module>thread</module>
         <module>shell</module>
+        <module>bigdata</module>
     </modules>
     <dependencyManagement>
     <dependencies>
