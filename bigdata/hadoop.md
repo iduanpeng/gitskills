@@ -25,4 +25,23 @@ export JAVA_HOME HADOOP_HOME PATH
 ```  
 
 * `hadoop namenode -format`格式化生成路径 
+![格式化图片](./img/namenode-format.png)
 * `hadoop-daemon.sh start namenode` web 访问 `ip:50070` 可以验证namenode是否启动成功
+
+* yarn配置 `yarn-site.xml`
+```xml
+<property>
+    <description>The hostname of the RM.</description>
+    <name>yarn.resourcemanager.hostname</name>
+    <value>0.0.0.0</value>
+  </property> 
+```
+
+* mapreduce 程序在yarn上运行需要配置 `mapred-site.xml`
+```xml
+<property>
+  <name>mapreduce.framework.name</name>
+  <value>yarn</value>
+</property>
+```
+* 
