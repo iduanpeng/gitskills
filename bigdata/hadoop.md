@@ -67,3 +67,68 @@ export JAVA_HOME HADOOP_HOME PATH
        |DN   | DN  |  DN |
        |NM   | NM  |  NM |
        |NN   | RM  |  2NM|
+* 配置`core-site.xml` 同单机版
+* `hdfs-site.xml` 配置2NN
+```xml
+<property>
+  <name>dfs.namenode.secondary.https-address</name>
+  <value>0.0.0.0:9869</value>
+  <description>
+    The secondary namenode HTTPS server address and port.
+  </description>
+</property>
+```
+* `yarn-site.xml`配置RM
+```xml
+<property>
+    <description>The hostname of the RM.</description>
+    <name>yarn.resourcemanager.hostname</name>
+    <value>0.0.0.0</value>
+  </property> 
+```
+* 启动hadoop
+    1. 先格式化namenode
+    2. `hadoop-daemon.sh start namenode && datanode`
+    3. `hadoop-daemon.sh start secondarynamenode`
+    4. `yarn-daemon.sh start resourcemanager && yarn-daemon.sh start nodemanager`
+    5. `/sbin/start-all.sh`群起脚本注意事项：是读取 `HADOOP_HOME/etc/hadoop/slaves(wokers)` 获取集群中所有节点主机名
+       注意需要配置SSH 免密登录 和 当前用户家目录 `.bashrc` 配置了 `source /etc/profile`
+* 配置历史服务器 `mapred-site.xml`
+```xml
+<property>
+  <name>mapreduce.jobhistory.address</name>
+  <value>0.0.0.0:10020</value>
+  <description>MapReduce JobHistory Server IPC host:port</description>
+</property>
+
+<property>
+  <name>mapreduce.jobhistory.webapp.address</name>
+  <value>0.0.0.0:19888</value>
+  <description>MapReduce JobHistory Server Web UI host:port</description>
+</property>
+```
+`yarn-site.xml`
+```xml
+<property>
+    <description>
+    URL for log aggregation server
+    </description>
+    <name>yarn.log.server.url</name>
+    <value>http://hadoop1:19888/jobhistory/logs</value>
+  </property>
+```
+```xml
+<property>
+    <name>yarn.log-aggregation-enable</name>
+    <value>true</value>
+  </property>
+```
+```xml
+<property>
+    <description>How long to keep aggregation logs before deleting them.  -1 disables. 
+    Be careful set this too small and you will spam the name node.</description>
+    <name>yarn.log-aggregation.retain-seconds</name>
+    <value>-1</value>
+  </property> 
+```
+       
