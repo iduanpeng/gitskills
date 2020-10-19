@@ -131,4 +131,233 @@ export JAVA_HOME HADOOP_HOME PATH
     <value>-1</value>
   </property> 
 ```
-       
+* hadoop HA（保证NM 和 RM 故障时 采取容错机制）  
+    1. 元数据的同步  
+       在active的NN格式化后，将空白的fsimage文件拷贝到所有NN的机器上  
+       active的NN启动后，将edits文件中的内容发给journalNode进程，standby状态的NN主动从journalNode进程中同步元数据  
+    2. journalNode适合启动奇数台，至少三个  
+    3. 如果开启了hdfs的HA，不能再启动2NN
+* HDFS HA搭建
+    1.  fs.defaultFS= 进行修改，配置N个NN运行的主机和开发的端口
+    2. 配置journalNode
+    3. 先启动journalNode
+    4. 启动所有的NN，将其中一个转active状态
+    5. 配置 `core-site.xml`文件
+    ```xml
+		<property>
+			<name>fs.defaultFS</name>
+        	<value>hdfs://mycluster</value>
+		</property>
+    ```
+    6. 配置 `hdfs-site.xml`文件
+    ```xml
+    <!-- 完全分布式集群名称 -->
+    	<property>
+    		<name>dfs.nameservices</name>
+    		<value>mycluster</value>
+    	</property>
+    
+    	<!-- 集群中NameNode节点都有哪些 -->
+    	<property>
+    		<name>dfs.ha.namenodes.mycluster</name>
+    		<value>nn1,nn2</value>
+    	</property>
+    
+    	<!-- nn1的RPC通信地址 -->
+    	<property>
+    		<name>dfs.namenode.rpc-address.mycluster.nn1</name>
+    		<value>hadoop102:9000</value>
+    	</property>
+    
+    	<!-- nn2的RPC通信地址 -->
+    	<property>
+    		<name>dfs.namenode.rpc-address.mycluster.nn2</name>
+    		<value>hadoop103:9000</value>
+    	</property>
+    
+    	<!-- nn1的http通信地址 -->
+    	<property>
+    		<name>dfs.namenode.http-address.mycluster.nn1</name>
+    		<value>hadoop102:50070</value>
+    	</property>
+    
+    	<!-- nn2的http通信地址 -->
+    	<property>
+    		<name>dfs.namenode.http-address.mycluster.nn2</name>
+    		<value>hadoop103:50070</value>
+    	</property>
+    
+    	<!-- 指定NameNode元数据在JournalNode上的存放位置 -->
+    	<property>
+    		<name>dfs.namenode.shared.edits.dir</name>
+    	<value>qjournal://hadoop102:8485;hadoop103:8485;hadoop104:8485/mycluster</value>
+    	</property>
+    
+    	<!-- 配置隔离机制，即同一时刻只能有一台服务器对外响应 -->
+    	<property>
+    		<name>dfs.ha.fencing.methods</name>
+    		<value>sshfence</value>
+    	</property>
+    
+    	<!-- 使用隔离机制时需要ssh无秘钥登录-->
+    	<property>
+    		<name>dfs.ha.fencing.ssh.private-key-files</name>
+    		<value>/home/atguigu/.ssh/id_rsa</value>
+    	</property>
+    
+    	<!-- 声明journalnode服务器存储目录-->
+    	<property>
+    		<name>dfs.journalnode.edits.dir</name>
+    		<value>/opt/ha/hadoop-2.7.2/data/jn</value>
+    	</property>
+    
+    	<!-- 关闭权限检查-->
+    	<property>
+    		<name>dfs.permissions.enable</name>
+    		<value>false</value>
+    	</property>
+    
+    	<!-- 访问代理类：client，mycluster，active配置失败自动切换实现方式-->
+    	<property>
+      		<name>dfs.client.failover.proxy.provider.mycluster</name>
+    	<value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
+    	</property>
+    ```
+    7. 在各个JournalNode节点上，输入以下命令启动journalnode服务 `sbin/hadoop-daemon.sh start journalnode`
+    8. 在[nn1]上，对其进行格式化，并启动  
+    `bin/hdfs namenode -format`  
+    `sbin/hadoop-daemon.sh start namenode`
+    9. 在[nn2]上，同步nn1的元数据信息  
+    `bin/hdfs namenode -bootstrapStandby`
+    10. 启动[nn2]
+    `sbin/hadoop-daemon.sh start namenode`
+    11. 查看web页面显示，如图3-21，3-22所示  
+    ![namenode1](./img/hadoop1.png)  
+    ![namenode2](./img/hadoop2.png)  
+    12. 在[nn1]上，启动所有datanode  
+    `sbin/hadoop-daemons.sh start datanode`
+    13. 将[nn1]切换为Active  
+    `bin/hdfs haadmin -transitionToActive nn1`
+    14.	查看是否Active  
+    `bin/hdfs haadmin -getServiceState nn1`
+    15. 配置HDFS-HA自动故障转移  
+    hdfs-site.xml
+    ```xml
+    <property>
+    	<name>dfs.ha.automatic-failover.enabled</name>
+    	<value>true</value>
+    </property>
+    ```
+    core-site.xml
+    ```xml
+    <property>
+    	<name>ha.zookeeper.quorum</name>
+    	<value>hadoop102:2181,hadoop103:2181,hadoop104:2181</value>
+    </property>
+    ```
+    16. 启动
+        1. 关闭所有HDFS服务  
+        `sbin/stop-dfs.sh`  
+        2. 启动Zookeeper集群  
+        `bin/zkServer.sh start`
+        3. 初始化HA在Zookeeper中状态  
+        `bin/hdfs zkfc -formatZK`
+        4. 启动HDFS服务  
+        `sbin/start-dfs.sh`
+        5. 在各个NameNode节点上启动DFSZK Failover Controller，先在哪台机器启动，哪个机器的NameNode就是Active NameNode  
+        `sbin/hadoop-daemin.sh start zkfc`
+        6. 验证  
+            1. 将Active NameNode进程kill  
+            `将Active NameNode进程kill`
+            2. 将Active NameNode机器断开网络  
+            `service network stop`
+* yarn-HA配置
+    1. 规划集群  
+    
+    | hadoop102 | hadoop103 | hadoop104 |
+    | ----      | ----      | ----      |
+    | NameNode  | NameNode  |           |
+    | JournalNode | JournalNode | JournalNode |
+    | DataNode  | DataNode  | DataNode |
+    | ZK        | ZK        | ZK       |
+    | ResourceManager| ResourceManager|   |
+    | NodeManager  | NodeManager  |           |
+    2. yarn-site.xml 配置 
+    
+    ```xml
+    <configuration>
+    <property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle</value>
+    </property>
+
+    <!--启用resourcemanager ha-->
+    <property>
+        <name>yarn.resourcemanager.ha.enabled</name>
+        <value>true</value>
+    </property>
+ 
+    <!--声明两台resourcemanager的地址-->
+    <property>
+        <name>yarn.resourcemanager.cluster-id</name>
+        <value>cluster-yarn1</value>
+    </property>
+
+    <property>
+        <name>yarn.resourcemanager.ha.rm-ids</name>
+        <value>rm1,rm2</value>
+    </property>
+
+    <property>
+        <name>yarn.resourcemanager.hostname.rm1</name>
+        <value>hadoop102</value>
+    </property>
+
+    <property>
+        <name>yarn.resourcemanager.hostname.rm2</name>
+        <value>hadoop103</value>
+    </property>
+ 
+    <!--指定zookeeper集群的地址--> 
+    <property>
+        <name>yarn.resourcemanager.zk-address</name>
+        <value>hadoop102:2181,hadoop103:2181,hadoop104:2181</value>
+    </property>
+
+    <!--启用自动恢复--> 
+    <property>
+        <name>yarn.resourcemanager.recovery.enabled</name>
+        <value>true</value>
+    </property>
+ 
+    <!--指定resourcemanager的状态信息存储在zookeeper集群--> 
+    <property>
+        <name>yarn.resourcemanager.store.class</name>     <value>org.apache.hadoop.yarn.server.resourcemanager.recovery.ZKRMStateStore</value>
+    </property>
+    </configuration>
+    ```  
+
+    3. 启动hdfs(启动过可忽略此步骤)
+        1. 在各个JournalNode节点上，输入以下命令启动journalnode服务  
+        `sbin/hadoop-daemon.sh start journalnode`
+        2. 在[nn1]上，对其进行格式化，并启动  
+            `bin/hdfs namenode -format`  
+            `sbin/hadoop-daemon.sh start namenode`
+        3. 在[nn2]上，同步nn1的元数据信息  
+            `bin/hdfs namenode -bootstrapStandby`
+        4. 启动[nn2]
+            `sbin/hadoop-daemon.sh start namenode`
+        5. 查看web页面显示，如图所示  
+            ![namenode1](./img/hadoop1.png)  
+            ![namenode2](./img/hadoop2.png)  
+        6. 在[nn1]上，启动所有datanode  
+            `sbin/hadoop-daemons.sh start datanode`
+        7. 将[nn1]切换为Active  
+            `bin/hdfs haadmin -transitionToActive nn1`
+    4. 启动YARN 
+        1. 在hadoop102中执行  
+        `sbin/start-yarn.sh`
+        2. 在hadoop103中执行  
+        `sbin/yarn-daemon.sh start resourcemanager`
+        3. 查看服务状态，如图所示  
+        ![yarn](./img/yarn.png)
