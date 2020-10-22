@@ -1,0 +1,127 @@
+一、DML导入
+
+1.load : 作用将数据直接加载到表目录中
+	语法：  load  data [local] inpath 'xx' into table 表名 partition()
+
+				local:  如果导入的文件在本地文件系统，需要加上local，使用put将本地上传到hdfs
+						不加local默认导入的文件是在hdfs，使用mv将源文件移动到目标目录
+
+2. insert： insert方式运行MR程序，通过程序将数据输出到表目录！
+		在某些场景，必须使用insert方式来导入数据：
+				①向分桶表插入数据
+				②如果指定表中的数据，不是以纯文本形式存储，需要使用insert方式导入
+
+	语法： insert into|overwrite table 表名 select xxx | values(),(),()
+				insert into: 向表中追加新的数据
+				insert overwrite： 先清空表中所有的数据，再向表中添加新的数据
+
+	特殊情况： 多插入模式(从一张源表查询，向多个目标表插入)
+				from 源表
+				insert xxxx  目标表  select xxx
+				insert xxxx  目标表  select xxx
+				insert xxxx  目标表  select xxx
+
+	举例： from deptpart2
+           insert into table deptpart1 partition(area='huaxi') select deptno,dname,loc
+            insert into table deptpart1 partition(area='huaxinan') select deptno,dname,loc
+
+3. location: 在建表时，指定表的location为数据存放的目录
+
+4. import :  不仅可以导入数据还可以顺便导入元数据(表结构)。Import只能导入export输出的内容！
+
+IMPORT [[EXTERNAL] TABLE 表名(新表或已经存在的表) [PARTITION (part_column="value"[, ...])]]
+  FROM 'source_path'
+  [LOCATION 'import_target_path']
+				①如果向一个新表中导入数据，hive会根据要导入表的元数据自动创建表
+				②如果向一个已经存在的表导入数据，在导入之前会先检查表的结构和属性是否一致
+						只有在表的结构和属性一致时，才会执行导入
+				③不管表是否为空，要导入的分区必须是不存在的
+
+  import external table importtable1  from '/export1'
+
+二、DML之导出
+1. insert :  将一条sql运算的结果，插入到指定的路径
+		语法： insert overwrite [local] directory '/opt/module/datas/export/student'
+			   row format xxxx
+               select * from student;
+
+2. export ：  既能导出数据，还可以导出元数据(表结构)！
+			  export会在hdfs的导出目录中，生成数据和元数据！
+			  导出的元数据是和RDMS无关！
+			  如果是分区表，可以选择将分区表的部分分区进行导出！
+
+		语法：  export table 表名 [partiton(分区信息) ] to 'hdfspath'
+
+
+
+三、排序
+		Hive的本质是MR，MR中如何排序的！
+				全排序：  结果只有一个(只有一个分区)，所有的数据整体有序！
+				部分排序：  结果有多个(有多个分区)，每个分区内部有序！
+				二次排序：  在排序时，比较的条件有多个！
+
+				排序： 在reduce之前就已经排好序了，排序是shuffle阶段的主要工作！
+
+		排序？
+		分区：使用Partitioner来进行分区！
+					当reduceTaskNum>1，设置用户自己定义的分区器，如果没有使用HashParitioner!
+					HashParitioner只根据key的hashcode来分区！
+
+ORDER BY col_list ：  全排序！
+SORT BY col_list ： 部分排序！ 设置reduceTaskNum>1。 只写sort by是随机分区！
+						如果希望自定定义使用哪个字段分区，需要使用DISTRIBUTE BY
+
+DISTRIBUTE BY  col_list：指定按照哪个字段分区！结合sort by 使用！
+CLUSTER BY col_list  ： 如果分区的字段和排序的字段一致，可以简写为CLUSTER BY
+							DISTRIBUTE BY sal sort by sal asc  等价于  CLUSTER BY  sal
+
+						要求： CLUSTER BY  后不能写排序方式，只能按照asc排序！
+
+------------------------------------------------------------
+insert overwrite local directory '/home/atguigu/sortby'
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+select * from emp DISTRIBUTE BY deptno sort by sal desc ;
+
+insert overwrite local directory '/home/atguigu/sortby'
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+select * from emp where mgr is not null CLUSTER BY  mgr ;
+
+四、函数
+
+1.查看函数
+		函数有库的概念，系统提供的除外，系统提供的函数可以在任意库使用！
+		查看当前库所有的函数：show functions;
+		查看函数的使用： desc function 函数名
+		查看函数的详细使用： desc function extended 函数名
+
+2.函数的分类
+		函数的来源：  ①系统函数，自带的，直接使用即可
+					  ②用户自定义的函数。
+							a)遵守hive函数类的要求，自定义一个函数类
+							b)打包函数，放入到hive的lib目录下，或在HIVE_HOME/auxlib
+									auxlib用来存放hive可以加载的第三方jar包的目录
+							c)创建一个函数，让这个函数和之前编写的类关联
+									函数有库的概念
+							d)使用函数
+
+		函数按照特征分：   ①UDF：  用户定义的函数。 一进一出。 输入单个参数，返回单个结果！
+										cast('a' as int) 返回 null
+						   ②UDTF:  用户定义的表生成函数。 一进多出。传入一个参数(集合类型)，返回一个结果集！
+						   ③UDAF： 用户定义的聚集函数。 多进一出。 传入一列多行的数据，返回一个结果(一列一行)
+										count,avg,sum
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

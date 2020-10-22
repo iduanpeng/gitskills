@@ -357,7 +357,31 @@ export JAVA_HOME HADOOP_HOME PATH
     4. 启动YARN 
         1. 在hadoop102中执行  
         `sbin/start-yarn.sh`
-        2. 在hadoop103中执行  
+        2. 在hadoop103中执行  （只会启动本机的resourcemanager 需要再手动启动另外一个resourcemanager）
         `sbin/yarn-daemon.sh start resourcemanager`
         3. 查看服务状态，如图所示  
         ![yarn](./img/yarn.png)
+* FIFO调度器（单队列）
+* 容量调度器（多个队列  每个队列可以配置 资源 eq：30%）
+    1. 容量保障。管理员可以为每个队列设置资源最低保证和资源使用上限
+    2. 灵活性。如果一个队列中的资源有剩余，可以暂时共享给那些需要资源的队列，而一旦该队列有新的任务提交，其他队列释放的资源会归还
+    3. 多重租赁。哪些用户可以在哪个队列上提交任务
+    4. 默认是一个队列 在`capacity-scheduler.xml` 配置多队列  
+    ```xml
+    <property>
+        <name>yarn.scheduler.capacity.root.queues</name>
+        <value>default,a,b</value>
+        <description>
+          The queues at the this level (root is the root queue).
+        </description>
+      </property>
+    ```
+    容量配置  
+    ```xml
+    <property>
+        <name>yarn.scheduler.capacity.root.a.capacity</name>
+        <value>40</value>
+        <description>Default queue target capacity.</description>
+      </property>
+    ```
+* 公平调度器(与容量调度器不同的是 在调度算法上 采用最大最小公平算法来调度job，会保证同一队列中，所有已提交，未运行状态的job，获取到队列中的资源是平等的)

@@ -1,0 +1,156 @@
+一、常用函数
+
+1.NVL
+		NVL( string1, replace_with)： 判断string1是否为null，如果为null，使用replace_with替换null，否则
+					不做操作！
+					
+		在以下场景使用： ①将NULL替换为默认值
+						 ②运行avg()
+						 
+2.concat:   字符串拼接。 可以在参数中传入多个string类型的字符串，一旦有一个参数为null，返回Null！
+
+3.concat_ws:   使用指定的分隔符完成字符串拼接！
+		concat_ws(分隔符,[string | array<string>]+)
+		
+4. collect_set:   collect_set(列名) ： 将此列的多行记录合并为一个set集合，去重
+
+5. collect_list: collect_list(列名) ： 将此列的多行记录合并为一个set集合，不去重
+
+6. explode:   explode(列名) 
+						参数只能是array或map!
+						将array类型参数转为1列N行
+						将map类型参数转为2列N行
+		
+二、练习一
+
+ emp_sex.name  | emp_sex.dept_id  | emp_sex.sex 
+ 求每个部分男女各有多少人
+ 思路一： 先按照性别过滤，求这个性别有多少人。再将同一个部分男女性别各多少人Join后拼接成一行结果！
+ select t1.dept_id,male_count,female_count
+ from
+ (select dept_id,count(*) male_count from emp_sex
+ where sex='男'
+ group by dept_id) t1
+ join
+ (select dept_id,count(*) female_count from emp_sex
+ where sex='女'
+ group by dept_id) t2
+ on t1.dept_id=t2.dept_id
+ 
+ 尽量避免子查询！
+ 思路一： 在求男性个数时，求男性总数！求总数，可以使用sum(数字),需要将每个人的性别由男|女 转为数字！
+			在求男性总人数，如果当前人的性别为男，记1，
+			在求女性总人数，如果当前人的性别为女，记1，
+ 
+ 判断函数：
+ case ... when :  
+			case  列名 
+					when  值1  then  值2
+					when  值3  then  值4
+					...
+					else 值5
+			end
+			
+			
+ select dept_id,
+ sum(case sex when '男' then 1 else 0 end) male_count,
+ sum(case sex when '女' then 1 else 0 end) female_count
+ from emp_sex
+ group by dept_id 
+			
+
+ if(判断表达式,值1(表达式为true),值2(表达式为false))
+ 
+  select dept_id,
+ sum(if(sex='男',1,0)) male_count,
+ sum(if(sex='女',1,0)) female_count
+ from emp_sex
+ group by dept_id 
+ 
+ 
+ 三、练习二
+ 
+ 行转列：   1列N行 转为 1列1行
+ 
+ select后面只能写分组后的字段和聚集函数！
+		聚集函数： 多进一出
+ 
+ 
+ person_info.name  | person_info.constellation  | person_info.blood_type  
+ 
+ 把星座和血型一样的人归类到一起。结果如下：
+射手座,A            大海|凤姐
+
+select  concat(constellation,',',blood_type),concat_ws('|',collect_list(name))
+from person_info
+group by constellation,blood_type
+
+四、练习三
+
+列转行： 1列1行 转为  1列N行
+	explode函数属于UDTF，UDTF在使用时，不能和其他表达式一起出现在select子句后！
+				只能单独出现在select子句后！
+
+ movie_info.movie  |     movie_info.category 
+《疑犯追踪》            | ["悬疑","动作","科幻","剧情"]
+期望结果：
+《疑犯追踪》      悬疑
+《疑犯追踪》      动作
+《疑犯追踪》      科幻
+《疑犯追踪》      剧情
+《Lie to me》   悬疑
+
+-------------不允许----------
+select movie,explode(category) 
+from  movie_info
+
+--------不符合要求--------------
+select movie,col1
+from movie_info
+join 
+(select explode(category)  col1
+from  movie_info) tmp
+
+处理：
+①先explode
+②需要将炸裂后的1列N行，在逻辑上依然视作1列1行，实际是1列N行，和movie进行笛卡尔集
+		这个操作在hive中称为侧写(lateral vIEW)
+		
+		Lateral view explode()   临时表名   as  临时列名
+		
+select movie,col1
+from movie_info Lateral view  explode(category) tmp1 as col1
+
+五、练习四
+
+数据：
+
+names				tags						hobbys
+jack|tom|jerry	阳光男孩|肌肉男孩|直男	晒太阳|健身|说多喝热水
+marry|nancy	阳光女孩|肌肉女孩|腐女	晒太阳|健身|看有内涵的段子
+
+create table person_info2(names array<string>,tags array<string>,hobbys array<string>)
+row format delimited fields terminated by '\t'
+collection items terminated by '|'
+
+期望结果：
+jack	阳光男孩	晒太阳
+jack	阳光男孩	健身
+jack	阳光男孩	说多喝热水
+jack	肌肉男孩	晒太阳
+jack	肌肉男孩	健身
+jack	肌肉男孩	说多喝热水
+.....
+
+select name,tag,hobby
+from person_info2
+lateral view explode(names) tmp1 as name
+lateral view explode(tags) tmp1 as tag
+lateral view explode(hobbys) tmp1 as hobby
+
+
+
+
+ 
+ 
+ 

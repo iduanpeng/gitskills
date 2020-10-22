@@ -1,0 +1,188 @@
+一、表操作
+
+1.增
+CREATE [EXTERNAL] TABLE [IF NOT EXISTS] table_name
+[(col_name data_type [COMMENT col_comment], ...)]   //表中的字段信息
+[COMMENT table_comment] //表的注释
+
+[PARTITIONED BY (col_name data_type [COMMENT col_comment], ...)] // 创建分区表
+
+[CLUSTERED BY (col_name, col_name, ...) //分桶表
+[SORTED BY (col_name [ASC|DESC], ...)] INTO num_buckets BUCKETS]  //分桶后排序
+
+[ROW FORMAT row_format]  // 表中数据每行的格式，定义数据字段的分隔符，集合元素的分隔符等
+
+[STORED AS file_format] //表中的数据要以哪种文件格式来存储，默认为TEXTFILE（文本文件）
+					可以设置为SequnceFile或 Paquret,ORC等
+[LOCATION hdfs_path]  //表在hdfs上的位置
+
+
+其他建表：
+			只复制表结构：  create table 表名 like  表名1
+			执行查询语句，将查询语句查询的结果，按照顺序作为新表的普通列：create table 表名  as select 语句
+						不能创建分区表！
+
+
+2.删
+		drop table 表名：删除表
+		truncate table 表名：清空管理表，只清空数据
+
+3.改
+		改表的属性：  alter table 表名 set tblproperties(属性名=属性值)
+
+		对列进行调整：
+				改列名或列类型： alter table 表名 change [column] 旧列名 新列名 新列类型 [comment 新列的注释]
+								 [FIRST|AFTER column_name] //调整列的顺序
+
+				添加列和重置列：ALTER TABLE table_name ADD|REPLACE COLUMNS (col_name data_type [COMMENT col_comment], ...)
+
+4.查
+		desc  表名： 查看表的描述
+		desc formatted 表名： 查看表的详细描述
+
+二、分区表
+[PARTITIONED BY (col_name data_type [COMMENT col_comment], ...)]
+
+1. 分区表
+		在建表时，指定了PARTITIONED BY ，这个表称为分区表
+
+2. 分区概念
+		MR：  在MapTask输出key-value时，为每个key-value计算一个区号，同一个分区的数据，会被同一个reduceTask处理
+				这个分区的数据，最终生成一个结果文件！
+
+				通过分区，将MapTask输出的key-value经过reduce后，分散到多个不同的结果文件中！
+
+		Hive:  将表中的数据，分散到表目录下的多个子目录(分区目录)中
+
+3. 分区意义
+		分区的目的是为了就数据，分散到多个子目录中，在执行查询时，可以只选择查询某些子目录中的数据，加快查询效率！
+		只有分区表才有子目录(分区目录)
+		分区目录的名称由两部分确定：  分区列列名=分区列列值
+
+		将输入导入到指定的分区之后，数据会附加上分区列的信息！
+		分区的最终目的是在查询时，使用分区列进行过滤！
+
+
+
+三、分区表操作
+
+1.创建分区表
+create external table if not exists default.deptpart1(
+deptno int,
+dname string,
+loc int
+)
+PARTITIONED BY(area string)
+row format delimited fields terminated by '\t';
+
+多级分区表，有多个分区字段
+create external table if not exists default.deptpart2(
+deptno int,
+dname string,
+loc int
+)
+PARTITIONED BY(area string,province string)
+row format delimited fields terminated by '\t';
+
+---------------------------------
+create external table if not exists default.deptpart3(
+deptno int,
+dname string,
+loc int
+)
+PARTITIONED BY(area string)
+row format delimited fields terminated by '\t'
+location 'hdfs://hadoop101:9000/deptpart3';
+
+2.分区的查询
+		show partitions 表名
+
+3. 创建分区
+		① alter table 表名 add partition(分区字段名=分区字段值) ;
+				a)在hdfs上生成分区路径
+				b)在mysql中metastore.partitions表中生成分区的元数据
+
+		② 直接使用load命令向分区加载数据，如果分区不存在，load时自动帮我们生成分区
+
+		③ 如果数据已经按照规范的格式，上传到了HDFS，可以使用修复分区命令自动生成分区的元数据
+				msck repair table 表名;
+
+
+注意事项：
+			①如果表是个分区表，在导入数据时，必须指定向哪个分区目录导入数据
+			②如果表是多级分区表，在导入数据时，数据必须位于最后一级分区的目录
+
+四、分桶表
+[CLUSTERED BY (col_name, col_name, ...)
+		分桶的字段，是从表的普通字段中来取
+[SORTED BY (col_name [ASC|DESC], ...)] INTO num_buckets BUCKETS]
+1. 分桶表
+		建表时指定了CLUSTERED BY，这个表称为分桶表！
+
+		分桶：  和MR中分区是一个概念！ 把数据分散到多个文件中！
+
+2. 分桶的意义
+		分桶本质上也是为了分散数据！在分桶后，可以结合hive提供的抽样查询，只查询指定桶的数据
+
+3. 在分桶时，也可以指定将每个桶的数据根据一定的规则来排序
+		如果需要排序，那么可以在CLUSTERED BY后根SORTED BY
+
+五、分桶表操作
+1.建表
+create table stu_buck(id int, name string)
+clustered by(id)
+SORTED BY (id desc)
+into 4 buckets
+row format delimited fields terminated by '\t';
+
+----临时表
+create table stu_buck_tmp(id int, name string)
+row format delimited fields terminated by '\t';
+
+2.导入数据
+	向分桶表导入数据时，必须运行MR程序，才能实现分桶操作！
+	load的方式，只是执行put操作，无法满足分桶表导入数据！
+	必须执行insert into
+		insert into 表名 values(),(),(),()
+		insert into 表名 select 语句
+
+
+	导入数据之前：
+			需要打开强制分桶开关： set hive.enforce.bucketing=true;
+			需要打开强制排序开关： set hive.enforce.sorting=true;
+
+	insert into table stu_buck select * from stu_buck_tmp
+
+3.抽样查询
+
+格式：select * from 分桶表 tablesample(bucket x out of y on 分桶表分桶字段);
+要求：
+①抽样查询的表必须是分桶表！
+②bucket x out of y on 分桶表分桶字段
+	假设当前表一共分了z个桶
+	x:   从当前表的第几桶开始抽样
+				0<x<=y
+	y:    z/y 代表一共抽多少桶！
+		要求y必须是z的因子或倍数！
+
+
+	怎么抽： 从第x桶开始抽样，每间隔y桶抽一桶，知道抽满 z/y桶
+
+	bucket 1 out of 2 on id：  从第1桶(0号桶)开始抽，抽第x+y*(n-1)，一共抽2桶   ： 0号桶,2号桶
+
+select * from stu_buck tablesample(bucket 1 out of 2 on id)
+
+	bucket 1 out of 1 on id：  从第1桶(0号桶)开始抽，抽第x+y*(n-1)，一共抽4桶   ： 0号桶,2号桶,1号桶,3号桶
+
+	bucket 2 out of 4 on id：  从第2桶(1号桶)开始抽，一共抽1桶   ： 1号桶
+
+	bucket 2 out of 8 on id：  从第2桶(1号桶)开始抽，一共抽0.5桶   ： 1号桶的一半
+
+
+
+
+
+
+
+
+
