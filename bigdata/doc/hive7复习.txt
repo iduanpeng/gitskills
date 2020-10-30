@@ -1,0 +1,109 @@
+一、hive的优化啊
+
+1.fetch抓取
+		开启fetch抓取的好处是如果fetch抓取的参数设置为more(默认)，那么如果
+		sql中仅有select,where以及Limit，此时使用fetchtask来查询数据，效率高！
+
+2.本地模式
+		本地模式在调试sql时，比在yarn上运行效率高！
+
+3.表的优化
+①小表和大表的join
+		在目前版本，两个表join的顺序是可以随意的，hive会自动优化
+②大表之间的join
+		有大表A,和大表B
+		A  left join B on A.c=B.c
+
+		如果在A表中有大量c字段的值为null!
+		a)如果A表c字段为null的数据不需要，可以进行空key过滤
+		b)如果A表c字段为null的数据需要，为例避免数据倾斜，需要进行空key转换
+				注意： 转换后类型必须匹配
+				        转换后的数据不能影响sql的执行结果
+
+③能用MapJoin就使用MapJoin
+		MapJoin适用于一个小表和大表之间的join！
+
+④Group by 优化
+		如果有某一组的数据特别多，也会造成数据倾斜，此时可以开启数据均衡开关！
+		hive.groupby.skewindata = true
+
+		之前的一个Job会转为两个job，第一个Job随机分区，进行局部聚合！
+		第二个Job再使用group by的字段分区，进行最终的聚合！
+⑤Count(distinct)
+			count(distinct) 可以替换为  count  from  (select xx group by xx)
+
+⑥行列过滤
+		行过滤：  查询时，先将无关的数据过滤，之后再进行其他操作
+		列过滤：  查询时不写select * ，按需查询
+
+⑦动态分区
+		在向分区表插入数据时，不指定向哪个分区插入数据，而是根据插入数据的某一列的
+		值作为分区！动态生成分区！
+
+		打开分区的非严格模式：hive.exec.dynamic.partition.mode=nonstrict
+		注意字段的顺序！分区列必须位于要导入数据的最后一个字段！
+		只能使用insert的方式导入数据！
+
+
+4.数据倾斜
+		合理设置map和reduce的个数！
+		map的个数取决于切片数据！
+		reduce的个数由用户手动设置！如果用户不设置，默认为-1，由系统自动根据数据量进行调整！
+
+5.并行执行
+
+6.严格模式
+		严格模式可以避免一些无意义的sql执行！
+
+二、Flume
+
+1.flume是什么
+		flume是java编写的一个高效，高可用，高可靠地对日志数据进行采集、聚合等操作的传输框架！
+
+2.flume中的核心概念
+
+agent：  是flume中启动的一个进程，由进程负责数据的传输
+
+event:  flume传输过程中数据的基本单位！一个event由header(map结构，存储每个消息的属性)，及body(字节数组，存储消息)
+
+source：  负责对接数据源，从数据源中获取数据，获取后封装为event对象，就event存储到channel中！
+
+sink: 从channel中读取event，将event写入到指定的目标
+
+interceptor： 拦截器、拦截器负责在source将event写入到channel的过程中对event进行拦截处理！
+					可以配置多个拦截器，多个拦截器按照顺序依次对event处理！
+
+channel selector:  channel选择器，在一个source对接多个channel时，从多个channel中选取合适的channel，由source处理！
+
+sink processor:  sink处理器，在多个sink对接一个channel时，同一时刻只能有一个sink工作，由sink processor挑选一个sink
+					干活！
+
+3.安装
+		只要机器安装了JDK，配置了JAVA_HOME即可！
+
+4.使用
+		flume-ng agent -n  agent的名称 -c  agent使用的其他配置文件的目录  -f  agent的配置文件 -D参数名=参数值
+
+5.编写agent的配置文件
+		①对sink,channel,source组件进行命名
+		②设置sink,channel,source组件的类型和参数
+		③组合sink,channel,source
+
+6.常见的组件
+
+netcat source:  类似于netcat的 nc -l 端口号！可以监听某个主机的指定端口收到的消息，将每行消息封装为一个event
+
+exec source :  执行一个linux命令，根据命令启动的进程获取进程在标注输出输出的内容，将内容封装为event!
+					要求进程必须是一个可以持续产生消息的进程，因为一旦进程停止，source就自动停止！
+
+logger sink： 多用于调试，可以将event由logger使用info级别，输出到控制台或文件！
+
+hdfs sink：  将event写入到hdfs!
+
+memory channel: 在内存中存储event!一旦进程发生故障，有丢失阶段性数据的风险！效率高！
+
+
+
+
+
+

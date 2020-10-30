@@ -1,0 +1,64 @@
+一、多个Agent串联场景
+
+1. 如果AgentA需要将Event对象发送到其他的agent进程中！
+		AgentA的sink，必须为AvroSink,其他的agent在接收时，必须选择AvroSource！
+		
+2. 常用组件
+①avrosource：  监听一个avro的端口，从另一个avro客户端接受event!
+	
+	必须配置：
+	type	–	The component type name, needs to be avro
+	bind	–	hostname or IP address to listen on
+	port	–	Port # to bind to
+	
+②avrosink： 将event转为avro格式的event，发送给指定的主机和端口
+	必须配置：
+	type	–	The component type name, needs to be avro.
+	hostname	–	The hostname or IP address to bind to.
+	port	–	The port # to listen on.
+		
+案例一：  在hadoop101，agent1:   netcatsource---memorychannel--arvosink
+		    hadoop101，agent2:    avrosource----memorychannel--loggersink
+#agent1
+#a1是agent的名称，a1中定义了一个叫r1的source，如果有多个，使用空格间隔
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+#组名名.属性名=属性值
+a1.sources.r1.type=netcat
+a1.sources.r1.bind=hadoop101
+a1.sources.r1.port=44444
+
+#定义sink
+a1.sinks.k1.type=avro
+a1.sinks.k1.hostname=hadoop102
+a1.sinks.k1.port=33333
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1
+
+--------------------------------------------------------
+#agent2
+#a1是agent的名称，a1中定义了一个叫r1的source，如果有多个，使用空格间隔
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+#组名名.属性名=属性值
+a1.sources.r1.type=avro
+a1.sources.r1.bind=hadoop102
+a1.sources.r1.port=33333
+
+#定义sink
+a1.sinks.k1.type=logger
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1

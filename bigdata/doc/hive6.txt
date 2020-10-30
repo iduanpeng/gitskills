@@ -1,0 +1,151 @@
+一、合理设置Map数
+
+1.ORC是否可以切片？
+		ORC不管是否用压缩，都可以切片！
+		ORC+Snappy
+		
+		ORC可以切片！
+			如果使用的是TextInputFormat，TextInputFormat根据文件的后缀判断是否是一个压缩格式，只要不是压缩格式，都可切！
+				如果是压缩格式，再判断是否使用的是可切的压缩格式类型！
+				
+		如果表在创建时，使用store as orc,此时这个表的输入格式会使用OrcInputFormat！
+			OrcInputFormat.getSplits()方法中，文件是可以切片的，即使使用snappy压缩，也可切！
+			
+2.Parquet是否切片？
+
+		Parquet文件不使用LZO压缩，可以切！
+		Parquet如果使用了LZO压缩，必须创建index后才可切！
+
+		如果表在创建时，使用store as Parquet,此时这个表的输入格式会使用ParquetInputFormat！
+				ParquetInputFormat继承了FileInputFormat!
+				 并没有重写isSplitable()方法啊，FileInputFormat.isSplitable(){return true};
+				 
+		Parquet文件格式在切片时，也可以切！
+		
+		Parquet+LZO格式的文件，在切片时是可以切！但是通常我们还会为此文件创建Index!
+				创建索引的目的是，在读入文件时，使用LZO合理的切片策略，而不是默认的切片策略！
+				因为如果表的存储为Parquet+LZO，此时表的输入格式已经不能设置为ParquetInputFormat，而需要设置为
+				LZOInputFormat！
+		
+二、表的优化
+
+1. 大小表的Join
+		在新版本的hive,两个表join时，hive会自动优化，自动进行小表Join 大表
+		
+2. 大表之间的Join
+		如果A表中有大量c字段为null的数据。如果不对null值处理，此时，会产生数据倾斜！
+		
+		情形一：A left join B  on A.c = b.c
+			
+			假如不需要id为null的数据！此时可以将A表中id为null的字段提前过滤，减少MR在执行时，输入的数据量！
+			
+			解决：	将null值过滤，过滤后再执行Join!
+				(select * from A where c is not null)A left join B  on A.c = b.c
+				
+		情形二： A表中c字段为null的数据也需要，不能过滤，如何解决数据倾斜？
+					注意：①可以将null替换为一个不影响执行结果的随机值！
+						  ②注意转换后类型匹配的问题
+				insert overwrite local directory '/home/atguigu/joinresult'
+				select n.* from nullidtable n full join ori o on 
+				case when n.id is null then -floor(rand()*100) else n.id end = o.id;
+					
+		
+3. Group by 优化
+			select  deptno,count(*)
+			from emp
+			group by  deptno
+			
+			此条语句在转为MR时，必须使用deptno进行分区，这样同一个deptno的数据才能分到一个reduceTask,只能执行count操作！
+			不优化，是一个MR！ 如果有一个deptno数据特别多，可能发生reduce端的数据倾斜！
+			
+			优化： hive.groupby.skewindata = true  自动启用负载均衡，可以避免reduce端的数据倾斜！
+							当此值为true时，将原先的一个Job，转为两个Job！
+							第一个Job，随机分区！
+								deptno   name
+								10		 jack
+								10		tom
+								10		marry
+								20		jack1
+								20		jack2
+								
+								当前是两个reduceTask
+									reduceTask1: 
+											10		 jack
+											10		tom
+											20		jack1
+											
+											在reduceTask1的reduce()中，设置deptno相同的为一个组(设置分组比较器)
+											同一个deptno会进入一次reduce()
+											
+											输出的结果： (10,2),(20,1)
+										
+											
+									reduceTask2:
+											10		marry
+											20		jack2
+											
+											输出的结果： (10,1),(20,1)
+							第二个Job，以第一个Job计算后的值，再按照deptno进行分区！
+										当前是两个reduceTask
+											reduceTask1: 
+													(10,2)
+													(10,1)
+													输出： (10,3)
+											reduceTask2:
+													(20,1),
+													(20,1)
+															(20,2)
+			
+4.动态分区
+		分区表为了将数据分散到表的多个子目录中！在查询时可以使用分区字段进行过滤！
+		
+		①创建分区表
+		②创建分区 
+				alter table 表名 add partition(分区列名=分区列值)
+		③向分区中导入数据(如果分区不存在，会自动创建)
+		静态分区：		load data local inpath 'xx' into table xxx partition(分区列名=分区列值)
+						在导入数据时，分区的名称已经确定！
+						
+		动态分区：   在导入数据时，根据数据某一列字段的值是什么，就自动创建分区！
+					 动态分区需要在动态分区非严格模式才能运行！
+							set hive.exec.dynamic.partition.mode=nonstrict;
+					 动态分区只能使用insert方式导入数据
+					 注意字段的顺序问题，分区列必须位于最后一个字段！
+					 
+		举例： ①建分区表：
+create external table if not exists default.emp2(
+empno int,
+ename string,
+job string,
+mgr int,
+hiredate string, 
+sal double, 
+comm double
+)
+partitioned by(deptno int)
+row format delimited fields terminated by '\t';
+			②insert into table emp2 partition(deptno)  select * from emp;
+			
+			
+create external table if not exists default.emp3(
+empno int,
+ename string,
+job string,
+hiredate string, 
+sal double, 
+comm double,
+deptno int
+)
+partitioned by(mgr int)
+row format delimited fields terminated by '\t';
+
+insert into table emp3 partition(mgr)  select empno,ename,job,hiredate,sal,comm,deptno,mgr from emp;
+
+		
+		
+ 		
+		
+		
+			
+		
+		

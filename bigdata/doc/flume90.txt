@@ -1,0 +1,48 @@
+一、监控
+
+1.如何实现监控
+	在使用flume期间，我们需要监控什么？
+		channel当前的容量是多少？
+		channel当前已经使用了多少容量？
+		source向channel中put成功了多少个event?
+		sink从channel中take成功了多少个event?
+	借助JMX技术！
+	
+2. JMX
+		J2EE定义了14种技术规范！
+			JDBC： java连接数据库的技术规范！
+			Servlet:  所有javaweb写的程序，都最终使用Servlet完成请求的接受和响应
+			JMX(java monitor extension)： java的监控扩展模块
+					JMX可以帮助我们实时监控一个java进程中需要了解的参数，可以实时修改java进程中某个对象的参数！
+					
+				①MBean(monitor bean): 监控的参数封装的Bean
+				②JMX的monitor服务，这个服务可以在程序希望获取到MBean参数时，来请求服务，请求后服务帮我们
+					对MBean的参数进行读写！
+					
+					flume已经提供了基于JMX的服务实现，如果我们希望使用，只需要启动此服务即可！
+				③客户端，客户端帮我们来向JMX服务发送请求，显示服务返回的Mbean的结果
+				
+3. 客户端
+①使用JCONSOLE程序查看
+		在flume的conf/env.sh文件中，配置
+		export JAVA_OPTS=”-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=5445 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false”
+②使用web浏览器向JMX服务发请求查看
+		使用JSON Reporting
+		bin/flume-ng agent --conf-file example.conf --name a1 -Dflume.monitoring.type=http -Dflume.monitoring.port=34545
+③使用第三方框架，例如Ganglia
+		可视化MBean：  内置一个可以处理Http请求的服务器(PHP)
+							ganglia-web(选集群的一台机器安装)
+		数据库：  需要把采集到的MBean的信息写入到数据库，在查询时，从数据库查询，返回结果
+							ganglia-gmetad(选集群的一台机器)负责将每台机器ganglia-gmond收集的数据汇总，汇总后存入数据库rrdtool
+		收集数据的服务：  需要在每个机器都部署一个收集本台机器上运行的进程的指标的服务，此服务
+						将收集的指标数据汇总到数据库中，由PHP程序来查询
+							ganglia-gmond(需要采集哪个机器的指标，就在哪个机器安装)负责监控MBean，采集数据
+							
+		
+		开源方案：  ①需要有一个可以请求JMX服务的框架  JMXTrans
+					②需要有一个数据库(时序数据库最佳)，数据来存储采集到的信息  Influxdb
+					③可视化框架来显示指标   Graffna
+
+	
+		
+		

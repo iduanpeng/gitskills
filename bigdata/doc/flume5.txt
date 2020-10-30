@@ -1,0 +1,98 @@
+一、Multiplexing Channel Selector
+1. Multiplexing Channel Selector根据evnet header中属性，参考用户自己配置的映射信息，将event发送到指定的channel!
+
+a1.sources = r1
+a1.channels = c1 c2 c3 c4
+a1.sources.r1.selector.type = multiplexing
+a1.sources.r1.selector.header = state
+a1.sources.r1.selector.mapping.CZ = c1
+a1.sources.r1.selector.mapping.US = c2 c3
+a1.sources.r1.selector.default = c4
+
+r1中每个event根据header中key为state的值，进行选择，如果state=CZ,这类event发送到c1，
+如果state=US,这类event发送到c2，c3,state=其他，发送到c4
+
+二、案例
+
+agent1:  在hadoop102
+#a1是agent的名称，a1中定义了一个叫r1的source，如果有多个，使用空格间隔
+a1.sources = r1
+a1.sinks = k1 k2
+a1.channels = c1 c2 
+#组名名.属性名=属性值
+a1.sources.r1.type=exec
+a1.sources.r1.command=tail -f /home/atguigu/test
+#声明r1的channel选择器
+a1.sources.r1.selector.type = multiplexing
+a1.sources.r1.selector.header = state
+a1.sources.r1.selector.mapping.CZ = c1
+a1.sources.r1.selector.mapping.US = c2
+
+#使用拦截器为event加上某个header
+a1.sources.r1.interceptors = i1
+a1.sources.r1.interceptors.i1.type = static
+a1.sources.r1.interceptors.i1.key = state
+a1.sources.r1.interceptors.i1.value = CZ
+
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+a1.channels.c2.type=memory
+a1.channels.c2.capacity=1000
+
+##定义sink
+a1.sinks.k1.type=avro
+a1.sinks.k1.hostname=hadoop101
+a1.sinks.k1.port=33333
+
+a1.sinks.k2.type=avro
+a1.sinks.k2.hostname=hadoop103
+a1.sinks.k2.port=33333
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1 c2
+a1.sinks.k1.channel=c1
+a1.sinks.k2.channel=c2
+
+-------------------------------------------------------
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+#组名名.属性名=属性值
+a1.sources.r1.type=avro
+a1.sources.r1.bind=hadoop101
+a1.sources.r1.port=33333
+
+
+#定义sink
+a1.sinks.k1.type=logger
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1
+
+-------------------------------------------------------
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+#组名名.属性名=属性值
+a1.sources.r1.type=avro
+a1.sources.r1.bind=hadoop103
+a1.sources.r1.port=33333
+
+#定义sink
+a1.sinks.k1.type=logger
+
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1

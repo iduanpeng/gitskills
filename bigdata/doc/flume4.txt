@@ -1,0 +1,91 @@
+一、Channel Selector
+
+1.Replicating Channel Selector
+		复制的channel选择器，也是默认的选择器！当一个source使用此选择器选择多个channel时，
+		source会将event在每个channel都复制一份！
+		
+		可选的channel: 向可选的channel写入event时，即便发生异常，也会忽略！
+		
+2. File Roll Sink
+		存储event到本地文件系统！
+		必需配置：
+		type	–	The component type name, needs to be file_roll.
+		sink.directory	–	The directory where files will be stored
+		
+3. 案例解析
+				(execsource----memory channel1----avrosink1)------(arvosource----memory channel----loggersink)
+						   ----memory channel2----avrosink2)------(arvosource----memory channel----filerollsink)
+				             
+agent1:  在hadoop102
+#a1是agent的名称，a1中定义了一个叫r1的source，如果有多个，使用空格间隔
+a1.sources = r1
+a1.sinks = k1 k2
+a1.channels = c1 c2 
+#组名名.属性名=属性值
+a1.sources.r1.type=exec
+a1.sources.r1.command=tail -f /home/atguigu/test
+#声明r1的channel选择器
+a1.sources.r1.selector.type = replicating
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+a1.channels.c2.type=memory
+a1.channels.c2.capacity=1000
+
+##定义sink
+a1.sinks.k1.type=avro
+a1.sinks.k1.hostname=hadoop101
+a1.sinks.k1.port=33333
+
+a1.sinks.k2.type=avro
+a1.sinks.k2.hostname=hadoop103
+a1.sinks.k2.port=33333
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1 c2
+a1.sinks.k1.channel=c1
+a1.sinks.k2.channel=c2
+
+-------------------------------------------------------
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+#组名名.属性名=属性值
+a1.sources.r1.type=avro
+a1.sources.r1.bind=hadoop101
+a1.sources.r1.port=33333
+
+
+#定义sink
+a1.sinks.k1.type=logger
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1
+
+-------------------------------------------------------
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+#组名名.属性名=属性值
+a1.sources.r1.type=avro
+a1.sources.r1.bind=hadoop103
+a1.sources.r1.port=33333
+
+#定义sink
+a1.sinks.k1.type=file_roll
+a1.sinks.k1.sink.directory=/home/atguigu/flume
+
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1

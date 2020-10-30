@@ -1,0 +1,116 @@
+一、SinkProcessor
+
+1.Default Sink Processor
+		如果agent中，只有一个sink，默认就使用Default Sink Processor，这个sink processor是不强制用户，
+		将sink组成一个组！
+		
+		如果有多个sink，多个sink对接一个channel，不能选择Default Sink Processor
+		
+2.Failover Sink Processor
+		Failover Sink Processor维护了一个多个sink的有优先级的列表，按照优先级保证，至少有一个sink是可以干活的！
+		如果根据优先级发现，优先级高的sink故障了，故障的sink会被转移到一个故障的池中冷却！
+		在冷却时，故障的sink也会不管尝试发送event，一旦发送成功，此时会将故障的sink再移动到存活的池中！
+		
+		必需配置：
+		sinks – Space-separated list of sinks that are participating in the group 
+		processor.type default The component type name, needs to be failover 
+		processor.priority.<sinkName> – Priority value. <sinkName> must be one of the sink instances associated with the current sink group A higher priority value Sink gets activated earlier. A larger absolute value indicates higher priority 
+
+案例：  
+		agent1:   execsource--memorychannel----avrosink1--------agent2: avroSource---memorychannel----loggersink
+											-----avrosink2--------agent3: avroSource---memorychannel----loggersink
+											
+				avrosink1的优先级高，优先被Failover Sink Processor选中，此时只有agent2可以输出event！
+				一旦 agent2挂掉，此时avrosink1故障，由Failover Sink Processor选择剩下的avrosink2干活！
+				
+配置：
+-----------------------hadoop102--agent1------------------
+#a1是agent的名称，a1中定义了一个叫r1的source，如果有多个，使用空格间隔
+a1.sources = r1
+a1.sinks = k1 k2
+a1.channels = c1
+
+a1.sinkgroups = g1
+a1.sinkgroups.g1.sinks = k1 k2
+#a1.sinkgroups.g1.processor.type = failover
+#a1.sinkgroups.g1.processor.priority.k1=100
+#a1.sinkgroups.g1.processor.priority.k2=90
+a1.sinkgroups.g1.processor.sinks=k1 k2
+a1.sinkgroups.g1.processor.type = load_balance
+#组名名.属性名=属性值
+a1.sources.r1.type=exec
+a1.sources.r1.command=tail -f /home/atguigu/test
+#声明r1的channel选择器
+a1.sources.r1.selector.type = replicating
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+##定义sink
+a1.sinks.k1.type=avro
+a1.sinks.k1.hostname=hadoop101
+a1.sinks.k1.port=33333
+
+a1.sinks.k2.type=avro
+a1.sinks.k2.hostname=hadoop103
+a1.sinks.k2.port=33333
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1
+a1.sinks.k2.channel=c1
+
+----------------------hadoop101----agent2------------------
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+#组名名.属性名=属性值
+a1.sources.r1.type=avro
+a1.sources.r1.bind=hadoop101
+a1.sources.r1.port=33333
+
+
+#定义sink
+a1.sinks.k1.type=logger
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1
+
+----------------------hadoop103----agent3------------------
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+#组名名.属性名=属性值
+a1.sources.r1.type=avro
+a1.sources.r1.bind=hadoop103
+a1.sources.r1.port=33333
+
+
+#定义sink
+a1.sinks.k1.type=logger
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1
+		
+3.Load balancing Sink Processor
+		负载均衡的sink processor! Load balancing Sink Processor维持了sink组中active状态的sink!
+		使用round_robin 或 random 算法，来分散sink组中存活的sink之间的负载！
+		
+		必需配置：
+		processor.sinks – Space-separated list of sinks that are participating in the group 
+		processor.type default The component type name, needs to be load_balance 
+
+		
+		
+		

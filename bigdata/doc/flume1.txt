@@ -1,0 +1,62 @@
+一、Flume的核心概念
+
+1.source ：  用户需要根据自己的数据源的类型，选择合适的source对象！
+
+2.sink：    用户需要根据自己的数据存储的目的地的类型，选择合适的sink对象！
+
+3. Interceptors:  在source将event放入到channel之前，调用拦截器对event进行拦截和处理！
+
+4. Channel Selectors:  当一个source对接多个channel时，由 Channel Selectors选取channel将event存入！
+
+5. sink processor:  当多个sink从一个channel取数据时，为了保证数据的顺序，由sink processor从多个sink中
+					挑选一个sink，由这个sink干活！
+					
+二、安装Flume
+
+1.版本区别
+		0.9之前称为flume og
+		0.9之后为flume ng
+		
+		目前都使用flume ng!
+		
+		1.7之前，没有taildirsource，1.7及之后有taildirsource
+		
+2.安装Flume
+		①保证有JAVA_HOME
+		②解压即可
+		
+3.使用Flume
+		启动agent:    flume-ng  agent  -n agent的名称  -f agent配置文件  -c 其他配置文件所在的目录 -Dproperty=value
+		
+4.如何编写agent的配置文件
+		agent的配置文件的本质是一个Properties文件！格式为 属性名=属性值
+		
+		在配置文件中需要编写：
+		①定义当前配置文件中agent的名称，再定义source,sink,channel它们的别名
+		②指定source和channel和sink等组件的类型
+		③指定source和channel和sink等组件的配置，配置参数名和值都需要参考flume到官方用户手册
+		④指定source和channel的对应关系，以及sink和channel的对应关系。连接组件！
+		
+5. 编写配置文件
+    a1.sources = r1
+    a1.sinks = k1
+    a1.channels = c1
+    #组名名.属性名 = 属性值(前缀统一加上)
+    a1.sources.type=netcat      / a1.sources.type=exec
+    r1.bind=hadoop102           / a1.sources.r1.command=tail -f /logs/hive.log
+    r1.port=44444               /
+
+    #定义sink
+    k1.type=logger              / a1.sinks.k1.type=hdfs     //一旦路径中含有基于时间得转义序列，要求event得header中必须有timestamp时间戳，如果没有需要将useLocalTimeStamp=true
+    k1.maxBytesToLog=100        / a1.sinks.k1.hdfs.path = hdfs://hadoop101:9000/flume/%Y%m%d/%H
+
+    #定义channel
+    c1.type=memory
+    c1.capacity=1000
+
+    #连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据
+    a1.sources.r1.channels=c1
+    a1.sinks.k1.channel=c1
+
+
+

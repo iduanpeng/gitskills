@@ -1,0 +1,18 @@
+a1.sources = r1
+a1.sinks = k1
+a1.channels = c1
+#组名名.属性名=属性值
+a1.sources.r1.type=com.atguigu.flume.custom.MySource
+a1.sources.r1.prefix=atguigu:
+
+#定义sink
+a1.sinks.k1.type=logger
+
+#定义chanel
+a1.channels.c1.type=memory
+a1.channels.c1.capacity=1000
+
+#连接组件 同一个source可以对接多个channel，一个sink只能从一个channel拿数据！
+a1.sources.r1.channels=c1
+a1.sinks.k1.channel=c1
+		

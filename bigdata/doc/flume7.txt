@@ -1,0 +1,33 @@
+一、事务
+
+1. 数量关系
+		batchSize:  每个Source和Sink都可以配置一个batchSize的参数。
+				这个参数代表一次性到channel中put|take 多少个event!
+				  batchSize <=  transactionCapacity
+				  
+		transactionCapacity： putList和takeList的初始值！
+		
+		capacity： channel中存储event的容量大小！
+							transactionCapacity <=  capacity
+				  
+2. 概念
+	putList:  source在向channel放入数据时的缓冲区！
+				putList在初始化时，需要根据一个固定的size初始化，这个size在channel中设置！
+				在channel中，这个size由参数transactionCapacity决定！
+	
+	
+	put事务流程：source将封装好的event，先放入到putList中，放入完成后，
+				一次性commit(),这批event就可以写入到channel!
+				写入完成后，清空putList，开始下一批数据的写入！
+				
+				假如一批event中的某些event在放入putList时，发生了异常，此时
+				要执行rollback(),rollback()直接清空putList。
+				
+	takeList: sink在向channel拉取数据时的缓冲区！
+	
+	
+	take事务流程：  sink不断从channel中拉取event，没拉取一个event，这个event会先放入takeList中！
+						当一个batchSize的event全部拉取到takeList中之后，此时由sink执行写出处理！
+						假如在写出过程中，发送了异常，此时执行回滚！将takeList中所有的event全部回滚到channel!
+						反之，如果写出没有异常，执行commit(),清空takeList！
+			

@@ -1,0 +1,111 @@
+一、ExecSource有丢失数据的可能
+		原因： execsource是一个异步的source，这个source一旦在source写入到channel故障时，无法通知数据源的客户端！
+				这样有丢失数据的风险
+
+		建议使用spoolingdirsource和taildirsource
+
+二、spoolingdirsource
+		spoolingdirsource固定监控一个目录(spoolingdir)新产生的文件！一旦有新的文件产生，就将新的文件的内容上传，
+		上传后使用删除策略或改名机制，以区分哪些是需要处理的文件，哪些是已经处理完成的！
+
+		注意事项： ①在目录的文件一旦放入目录就不能被修改
+				   ②放入目录的文件不能重名
+
+		一旦有上述其中之一的情况发生，此时flume进程停止！
+
+三、taildirsource
+		taildirsource可以同时监控多个文件，实时监控文件新写入的内容，将新写入的内容上传！
+
+		taildirsource不丢数据的原因在于，每次tail操作后，taildirsource都会将每个文件tail的最后位置记录在一个json文件中！
+		只要json文件不丢失，那么就可以保证数据准确安全！
+
+		注意：  同一个文件，在采集过程中，是不能被重命名，这样如果重命名后的文件依然被taildirsource的匹配规则匹配到！
+					此时就可能发生数据重复采集！
+
+四、AvroSource和AvroSink
+		一般当发生两个agent串联工作时！ 需要由第一个Agent使用avrosink将event传递给第二个sink的avrosouce!
+
+		AvroSource和AvroSink的主机名和绑定的端口的配置一致！
+
+
+五、FILERoll_sink
+		将event写入到本地的文件系统中，可以设置每间隔多久滚动文件！
+
+六、ChannelSelector
+1.Replicating（默认）:   当一个source选择了多个channel后，event会复制到每一个channel中！
+
+2.MultiPlexing：  根据eventheader中指定的key的值和用户配置的映射信息，根据规则将event分发到指定的channel！
+
+七、Sink Processor
+1. Default Sink Processor
+				当只有一个channel只对接一个sink时，使用Default Sink Processor，Default Sink Processor不要求
+				用户配置sink组的信息
+
+2. FailOverSink Processor
+				故障转移的sink 处理器！工作原理是维护一个有优先级的sink组！从组中挑选优先级最高的sink,
+				来channel中拉取数据，一旦正在工作的sink故障，此时从剩余的sink中再挑选优先级高的sink继续替换之前的sink工作！
+
+
+3. Load Balance Sink Processor
+				从一个组中，使用负载均衡的算法(round_rabin | random)，挑选sink来工作！
+				一个组中的多个sink，可以做到负载均衡！
+
+八、事务
+1. put事务
+			put事务指source将event放入channel的过程中，开启的事务！
+
+			流程：  source将封装好的event，先放入到putList(事务开启的缓冲区)，一批event在放入
+			putList期间，如果发生了异常，就回滚事务，此时清空putList!
+			如果没有发生异常，那么就提交事务，提交事务将event放入到channel中！
+
+
+2. take事务
+
+		take事务指sink从channel中拉取event，将event写入到目的地期间开启的事务！
+
+			流程：   sink从channel中拉取event，拉取后将event移动到takeList(事务开启的缓冲区)，将takeList
+			中的event写出到目的地，一旦一批event中，其中的一个event写出失败，那么就回滚事务，将takeList中
+			所有的一批event回滚到channel!
+
+			如果没有异常，就提交事务，清空takeList!
+
+3. 参数关系
+		batchSize： 在source和sink中配置！
+						batchSize越大，可以提升吞吐率！
+
+						batchSize<= transactionCapacity
+
+		transactionCapacity: 事务的缓冲区可以放入的最大的event数量！
+						在channel中配置！
+
+						transactionCapacity<=capatity
+
+		capatity:  channel的容量！
+
+
+		batchSize<= transactionCapacity <=capatity
+
+九、自定义Source
+
+1.自定义类，继承AbstractSource，实现Configurable和PollableSource接口
+2.实现process()方法
+		返回Status对象！
+			READY：  一旦成功封装了1个或多个event，放入到channel!
+			BACKOFF:  如果没有封装event或放入到channel失败！
+
+	process()被PollableSourceRunner线程循环调用！
+
+3.从configure()中获取配置文件中配置的参数值
+		context.getxxx("参数名","默认值")
+
+
+
+
+
+
+
+
+
+
+
+		
