@@ -1,0 +1,40 @@
+一、Kafka的主题操作
+
+主题信息属于kafka的元数据，存储在zookeeper中！
+1. 创建主题
+		①kafka-topics.sh --zookeeper hadoop102:2181 --create --topic hello --partitions 2 --replication-factor 2
+		
+		必须指定分区数和副本数！
+		每个broker最多存储一份副本，所以在创建主题时，副本数不能超过当前可用的broker的数量！
+		kafka集群根据负载均衡的策略，自动将分区分配到对应的broker实例中！
+		
+		②明确告诉kafka，创建多少个分区，以及每个分区的副本到底选择哪个broker
+		
+		kafka-topics.sh --zookeeper hadoop102:2181  --create --topic hello2  --replica-assignment 101:102,102:103
+		
+
+
+2. 查询所有的主题
+		kafka-topics.sh --zookeeper hadoop102:2181 --lis
+		
+3. 查看某个主题详细信息
+		kafka-topics.sh --zookeeper hadoop102:2181 --describe --topic hello
+		
+4. 修改主题
+		只能修改分区数(只允许增加)和副本的放置策略
+		bin/kafka-topics.sh --zookeeper hadoop102:2181 --alter  --topic hello2   --partitions 3
+		
+		ToDO:
+		bin/kafka-topics.sh --zookeeper hadoop102:2181 --alter  --topic hello2  --replica-assignment 102:103,101:102,101:103
+		
+5. 删除主题
+		bin/kafka-topics.sh --zookeeper hadoop102:2181 --delete --topic hello1
+		
+二、生产数据
+		kafka提供了用于测试的producer
+		
+三、消费者
+		消费者消费数据时，如果不指定offset，默认是从每个分区的最后一个位置开始消费！
+		消费者消费数据时，只能保证分区内部有序！和生成数据时的顺序是无关的！
+		如果希望数据整体有序，只能是一个主题只有一个分区！
+
