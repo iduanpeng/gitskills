@@ -1,0 +1,51 @@
+一、读流程
+找读取数据对应的rs:
+		①请求zookeeper，查询 /hbase/meta-region-server 节点，获取meta表所在的rs
+		②向meta表所在的rs发送读请求，讲读取到的内容缓存到客户端本地，此后就不需要频繁查询
+				meta表
+		③从meta表中，根据region和regionserver的对应关系，找到rowkey所属的region的regionserver
+		
+读取数据：
+		读取的数据存储在列族(store)中！列族在HDFS上就是一个目录，这个目录下存储了很多文件(storefile)
+		数据如果是刚写入到store中，还没有刷写到磁盘，当前数据就存储在memstore中，
+		有可能这个列的历史版本的数据已经刷写到磁盘存在storefile中，
+			在扫描时，需要既扫memstore，又扫磁盘上的storefile，扫描出当前列的所有版本的数据，从这些
+			数据中挑选出ts最大的返回！
+		
+		如果扫描历史版本的数据，是扫storefile，那么会发送磁盘IO，效率低，因此可以把扫描到的数据
+		所在的块(block)缓存到内存中，在内存中保存缓存块的区域，称为blockcache!
+		
+		在以后的查询中，如果查询的数据在blockcache中有，那么就不需要再扫描storefile了！如果没有，
+		再扫描storefile，讲数据所在的block缓存到blockcache!
+		
+		Blockcache在RS中的读缓存，blockcache默认大小为当前RS所在堆缓存的40%，有LRU的回收策略！
+		
+		block不是HDFS上中的block，是HFile中的block(64k)!
+-------------------------------------------
+get t1,r1  : 
+		扫描r1所在region的所有列族的memstore，从中找r1行的所有列的每个版本的最近数据
+		扫描r1所在region的所有列族的storefile，从中找r1行的所有列的每个版本的历史数据
+		讲最近的数据和历史数据，汇总，挑选每个列最新的数据！
+		讲刚刚扫描storefile数据所在的block，缓存到blockcache中
+		
+put t1,r1,cf1:name,jack: 当对数据作了修改时，此时blockcache中缓存就失效了！
+		
+scan t1 ,{STARTROW=>r1,STOPROW=>r4}: 扫描r1到r3行
+		扫描r1所在region的所有列族的memstore，从中找r1-r3行的所有列的每个版本的最近数据
+		扫描r1所在region的所有列族的storefile，从中找r2-r3行的所有列的每个版本的历史数据
+		从blockcache中扫描r1行所有的数据
+		
+		讲刚刚扫描storefile数据所在的block，缓存到blockcache中
+		
+二、VERSIONS
+1. 每个不同时间戳的cell就是一个版本，时间戳就是版本
+2. 可以设置列族的VERSIONS属性，当执行flush操作时，put的记录
+		会根据时间戳选择最新的VERSIONS个版本的数据flush到磁盘中！
+		
+		每次flush，最多flush VERSIONS个版本的数据！
+		
+		
+		
+		
+
+		

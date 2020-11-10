@@ -1,0 +1,252 @@
+一、HBase支持随机写
+		HBase的读写操作还是借助HDFS完成，要完成随机写，根本上还是需要复合HDFS的特性！
+		
+		HDFS只支持追加写！
+		
+		随机的操作： Update+Delete 借助  追加写+时间戳(版本号)
+		
+		只允许客户端查询时返回时间戳最新的数据！
+		
+二、 HBase支持海量数据的实时读写
+		①分布式
+		②索引，LSM树
+		③kv
+		④吃内存
+		⑤列式存储
+		⑥布隆过滤器（查询）
+		
+三、HBase是什么
+		HBase是基于hadoop的数据库！
+		
+		提供一个十亿级行*百万级列级别的表存储，对表中的数据提供实时的随机读写操作！
+四、HBase的安装和配置
+
+1.配置
+	①保证已经配置了JAVA_HOME,HADOOP_HOME环境变量
+	②编辑conf/env.sh
+			128行： export HBASE_MANAGES_ZK=false
+			注释掉46,47行！
+	③配置conf/hbase-site.xml
+		<property>
+                <name>hbase.rootdir</name>
+                <value>hdfs://hadoop101:9000/HBase</value>
+        </property>
+
+        <property>
+                <name>hbase.cluster.distributed</name>
+                <value>true</value>
+        </property>
+
+        <property>
+                <name>hbase.zookeeper.quorum</name>
+             <value>hadoop102:2181,hadoop103:2181,hadoop101:2181</value>
+        </property>
+
+        <property>
+                <name>hbase.zookeeper.property.dataDir</name>
+             <value>/opt/module/zookeeper-3.4.10/datas</value>
+        </property>
+
+			
+2.启动
+	①启动hdfs,zookeeper
+	②启动hbase
+			三台机器都启动regionserver: xcall /opt/module/hbase/bin/hbase-daemon.sh start regionserver
+			选择一台启动master: /opt/module/hbase/bin/hbase-daemon.sh start master
+			
+	③查看：
+			jps查看
+			访问web界面： 访问master进程所在机器:16010
+			
+	端口说明：  16000是master进程的RPC端口！
+				16010是master进程的http端口！
+				16020是RegionServer进程的RPC端口！
+				16030是RegionServer进程的http端口！
+				
+3. 停止
+	三台机器都停止regionserver: xcall /opt/module/hbase/bin/hbase-daemon.sh stop regionserver
+	选择一台停止master: /opt/module/hbase/bin/hbase-daemon.sh stop master
+	
+4. 群起和群停
+		hadoop-daemons.sh 先读取 HADOOP_HOME/etc/hadoop/slaves 中所有的主机名！
+		对这些主机，执行hadoop-daemon.sh start datanode,再启动NN！
+		
+		
+		hbase-daemons.sh 先读取 conf/regionservers 中所有的主机名！
+		
+		注意： hbase-daemons.sh或start-hbase.sh或stop-hbase.sh的前提是先配置
+					要执行这些命令所在的机器的conf/regionservers文件！
+
+5. 集群时钟同步
+		sudo ntpdate -u ntp4.aliyun.com
+
+三、hbase的表现
+
+1.默认有两张系统表
+		hbase:meta:  保存的是用户的表和region的对应信息
+		hbase:namespace:  保存的是用户自己创建的namespace的信息
+
+2.hbase中的对象的表现形式
+		库以目录的形式存放在 /HBase/data中
+		表是以子目录的形式存在在 /HBase/data/库名 中
+		region也是以子目录的形式存在  /HBase/data/库名/表名 中
+		列族也是以子目录的形式存在   /HBase/data/库名/表名/region 中
+		数据以文件的形式存放在   /HBase/data/库名/表名/region/列族 目录中
+
+四、hbase shell的使用
+
+1.在hbase shell中不要敲 ;，如果敲了;，需要敲两个 单引号结束！
+
+2. 在hbase shell中如果需要使用上下方向键查找历史命令，需要查看xshell的设置配置图！
+
+3. 查看帮助
+		help: 查看所有命令的帮助
+		help '命令'： 查看某个命令的帮助
+		help '组名' ： 查看某组命令的帮助
+
+		hbase shell使用ruby编写，不支持中文！
+
+五、查看Hfile
+		hbase org.apache.hadoop.hbase.io.hfile.HFile -e -p -f hdfs://xxx
+
+六、写流程
+		首先，需要找到写入的记录所在的region的regionserver，向这个rs发起请求！
+		需要查询hbase:meta表，查询region和regionserver的对应关系！
+
+		首先找到hbase:meta表region所在的regionserver，这个信息存在zk中！
+
+七、微观写流程
+
+try {
+      // ------------------------------------
+      // STEP 1. Try to acquire as many locks as we can, and ensure
+      // we acquire at least one.
+		尝试获取尽可能多的锁，至少得获取一个
+      // ----------------------------------
+
+      // ------------------------------------
+      // STEP 2. Update any LATEST_TIMESTAMP timestamps
+		跟新任意最近的时间，在插入记录时，timestamp是可选的，一旦不提供，使用服务器最近的时间戳来作为
+		timestamp
+      // ----------------------------------
+
+        //   CP(coprocessor): 协处理器(类似mysql中的trigger(触发器))。 通常有两个方法！ 一个方法是在被触发之前做xxx事
+		// 另一个方法是在触发之后做xxx事！
+      // calling the pre CP hook for batch mutation
+
+      // ------------------------------------
+      // STEP 3. Build WAL edit
+	     构建WAL对象
+      // ----------------------------------
+
+
+      // -------------------------
+      // STEP 4. Append the final edit to WAL. Do not sync wal.
+			讲最新的编辑操作添加到WAL对象的buffer(WAL对象内存中的一块区域)中，buffer中新添加的
+			数据暂时先不同步到wal的磁盘日志文件中！
+      // -------------------------
+         获取最新的MVCC(multi-version concurency control)号
+      // ------------------------------------
+      // Acquire the latest mvcc number
+      // ----------------------------------
+      // ------------------------------------
+      // STEP 5. Write back to memstore
+      // Write to memstore. It is ok to write to memstore
+      // first without syncing the WAL because we do not roll
+      // forward the memstore MVCC.
+			讲数据写入到memstore，当前我们的数据只是在WAL对象的buffer中，还没有sync到磁盘文件！
+			此时就把数据写入到memstore，是完全没问题的！因为我们还没有滚动mvcc版本号！
+	  The MVCC will be moved up when
+      // the complete operation is done. These changes are not yet
+      // visible to scanners till we update the MVCC. The MVCC is
+      // moved only when the WAL sync is complete.
+			只有当讲WAL中的buffer中的数据同步到磁盘文件后，MVCC号才会滚动！
+			在MVCC没有滚动期间，向memstore中写的数据，scanner是查不到的！
+      // ----------------------------------
+
+      // -------------------------------
+      // STEP 6. Release row locks, etc.
+		把行锁释放！
+      // -------------------------------
+
+      // -------------------------
+      // STEP 7. Sync wal.
+		讲WALbuffer中的数据sync到磁盘
+      // -------------------------
+      if (txid != 0) {
+        syncOrDefer(txid, durability);
+      }
+
+      doRollBackMemstore = false;
+      // calling the post CP hook for batch mutation
+	  // 调用协处理器的后置钩子程序
+
+      // ------------------------------------------------------------------
+      // STEP 8. Advance mvcc. This will make this put visible to scanners and getters.
+	  移动mvcc版本号，移动之后，scan和get操作就可以查询到此条数据
+      // ------------------------------------------------------------------
+      if (writeEntry != null) {
+        mvcc.completeAndWait(writeEntry);
+        writeEntry = null;
+      } else if (isInReplay) {
+        // ensure that the sequence id of the region is at least as big as orig log seq id
+        mvcc.advanceTo(mvccNum);
+      }
+
+      for (int i = firstIndex; i < lastIndexExclusive; i ++) {
+        if (batchOp.retCodeDetails[i] == OperationStatus.NOT_RUN) {
+          batchOp.retCodeDetails[i] = OperationStatus.SUCCESS;
+        }
+      }
+
+      // ------------------------------------
+      // STEP 9. Run coprocessor post hooks. This should be done after the wal is
+      // synced so that the coprocessor contract is adhered to.
+      // ------------------------------------
+      if (!isInReplay && coprocessorHost != null) {
+        for (int i = firstIndex; i < lastIndexExclusive; i++) {
+          // only for successful puts
+          if (batchOp.retCodeDetails[i].getOperationStatusCode()
+              != OperationStatusCode.SUCCESS) {
+            continue;
+          }
+          Mutation m = batchOp.getMutation(i);
+          if (m instanceof Put) {
+            coprocessorHost.postPut((Put) m, walEdit, m.getDurability());
+          } else {
+            coprocessorHost.postDelete((Delete) m, walEdit, m.getDurability());
+          }
+        }
+      }
+
+      success = true;
+      return addedSize;
+    } finally {
+      // if the wal sync was unsuccessful, remove keys from memstore
+	  // 在第七步，讲wal buffer中的数据同步到磁盘失败时，回滚已经写入到memstore中的cell，同时保持MVCC不变
+      if (doRollBackMemstore) {
+        for (int j = 0; j < familyMaps.length; j++) {
+          for(List<Cell> cells:familyMaps[j].values()) {
+            rollbackMemstore(cells);
+          }
+        }
+        if (writeEntry != null) mvcc.complete(writeEntry);
+      } else {
+        this.addAndGetGlobalMemstoreSize(addedSize);
+        if (writeEntry != null) {
+          mvcc.completeAndWait(writeEntry);
+        }
+      }
+
+
+  }
+
+  总结：  向region中写入数据时
+			①获取到锁
+			②生成数据的时间戳
+			③构建WAL对象
+			④讲数据写入到WAL的buffer中
+			⑤讲数据写入到memstore中
+			⑥将数据从WAL的buffer，sync到磁盘
+			⑦如果成功，滚动MVCC，客户端可见，写成功
+			⑧否则，回滚之前已经写入到memstore中的数据，写入失败
