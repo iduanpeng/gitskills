@@ -1,0 +1,135 @@
+一、读流程
+ 找到所读数据的Regionserver
+	①客户端请求zk的 /hbase/meta-region-server节点，读取到hbase:meta表所在regionserver
+	②请求rs，下载meta表
+	③查询meta表，当前所读region所在的rs
+	④向rs发起读请求
+ 读数据
+	⑤初始化两种scanner（扫描器）
+			memstorescannner：负责扫描store的memstore区域
+			storefileScanner: 负责扫描store的若干storefile
+			
+	⑥如果扫了storefile，会讲storefile数据所在的block(HFile中的block，64k)缓存到blockcache中
+		blockcache是rs的读缓存，默认占用rs所在堆的40%容量，采取LRU回收策略进行缓存的回收！
+		
+		此后如果读取的storefile文件已经缓存在blockcache了，那么就会从blockcache中读取数据
+		而无需扫描磁盘读取storefile。
+	⑦扫描memstore,storefile,blockcache,取出version（时间戳最大的数据）返回给客户端！
+	
+二、Flush
+
+1.讲memstore中的数据，刷写到磁盘，生成storefile的过程称为flush!
+		flush的目的是在memstore中对数据的rowkey进行排序，排序后刷写到磁盘后的数据
+		是有序的，方便检索！
+		
+2. 实现flush
+		hbase shell:  flush '表名'| 'region名'
+		
+3. 自动flush
+		①从容量上来说
+			a)如果单个memstore使用的容量超过hbase.hregion.memstore.flush.size(默认128M)，
+			整个region的memstore都会刷写！
+			
+			在刷写时，客户端依然可以向rs发起写请求，写的数据依然是存储在memstore中，但是
+			如果memstore使用的容量超过hbase.hregion.memstore.flush.size(默认128M) *
+			hbase.hregion.memstore.block.multiplier（默认值4）,此时memstore会自动block（阻塞）,
+			客户端无法再执行写入！
+			
+		    b)整个rs所有的memstore使用的容量总和超过java_heapsize
+			*hbase.regionserver.global.memstore.size（默认值0.4）
+			*hbase.regionserver.global.memstore.size.lower.limit（默认值0.95）
+			整个rs所有的memstore会依次按照大小顺序刷写。
+			
+			在刷写时，如果rs所有的memstore使用的容量总和超过java_heapsize
+			*hbase.regionserver.global.memstore.size（默认值0.4），此时所有的memstore也会block
+			
+		②从时间上来说
+			没间隔hbase.regionserver.optionalcacheflushinterval（1h），自动flush
+			
+		③从WAL正在写入的日志数量上来说
+			如果有大量的正在使用的WAL日志，说明memstore中有大量尚未刷写的数据，一旦数据过多，
+			rs进程崩溃，此时恢复数据时间过长。所以，一旦正在使用的WAL日志文件的数量超过
+			hbase.regionserver.max.logs(32)，此时，会根据WAL中记录的日志的先后顺序依次刷写memstore!
+
+三、 compact
+		目的： 对store中的多个hfile文件定期合并，消除每次flush产生的大量的小文件。
+				对hfile中无效的过期的数据，进行合并整理，较少数据量！
+				
+		分类：  minor_compact: 将临近的多个小文件，合并为一个大文件。不会删除delete类型的数据(0.94之前)！
+				major_compact： 将store目录中所有的文件，合并为一个大文件，会删除delete类型的数据！
+				
+				minor_compact和major_compact的区别是minor_compact只能合并有限数量的hfile！
+				major_compact是合并目录下所有的文件！
+				
+		对于major_compact建议取消自动合并的设置，改为在集群空闲时，手动执行合并！
+		
+四、region的切分
+		每张表在创建时，只有一个region.随着这个region中写入数据越来越多，此时，region
+		会自动完成切分，切分后的region有可能出于负载均衡的目的，会分配给其他的rs负责！
+		
+		自动切分：
+			①统计当前regionserver中负责的 当前表的region个数，称为tableRegionCount
+			②0=tableRegionCount 或 tableRegionCount>100，此时某个region超过hbase.hregion.max.filesize(10G)
+			时切分（一分为二）！
+			③0<tableRegionCount<=100,此时使用
+					initialSize * tableRegionsCount * tableRegionsCount * tableRegionsCount
+					和 hbase.hregion.max.filesize(10G)进行对比取较小值
+					
+			④initialSize，取决于用户的配置，由hbase.increasing.policy.initial.size自定义！
+				如果没有自定义通常为 2*hbase.hregion.memstore.flush.size,为 256M
+				
+五、API
+1.常用的API
+	Connection:  代表客户端和集群的一次连接。Connection的创建是重量级的，是线程安全的！
+					因此可以在多个线程中共享！
+					建议一个应用只创建一个Connection！
+					
+					ConnectionFactory.getConnnection();
+					
+	Admin：     对hbase执行管理性命令的客户端对象！
+				对库的创建，查看，删除等
+				对表的创建，查询，删除等！
+				
+				Admin的创建是轻量级的，不是线程安全的！建议每个线程都有自己的Admin对象！
+				Connection.getAdmin()
+				
+	Table：     对表中的数据执行增删改查！
+				
+				Table创建是轻量级的，不是线程安全的！建议每个线程都有自己的Table对象！
+				
+				Connection.getTable(TableName tn);
+				
+	TableName:  代表表的名称
+	
+	HTableDescriptor: 代表表的定义和描述！在这个对象中可以对表中的列族进行设置！
+	
+	HColumnDescriptor: 代表列族的定义和描述！
+	
+	NameSpaceDescriptor:  名称空间的定义和描述！
+	
+	Put:  对单行数据执行put操作的对象！在put中可以定义每次单行插入的数据！
+	
+	Get： 对单行数据的查询操作的对象！ 在get中可以定义每次查询的参数！
+	
+	Result: 单行查询返回的结果集！在result中包含若干个cell
+	
+	工具类：   CellUtil.cloneXxx(): 讲cell中的某个数据克隆为byte[]
+			   Bytes.toXxx():  从byte[]转为常用的基本数据类型
+			   Bytes.toBytes():  讲常用的基本数据类型转为byte[]
+			
+					
+		
+		
+
+
+
+
+
+
+				
+				
+		
+		
+			
+
+			

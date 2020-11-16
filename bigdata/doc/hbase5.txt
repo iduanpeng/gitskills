@@ -1,0 +1,118 @@
+一、
+	HBase负责存储，Hive负责分析！
+	hive的本质是使用HQL语句，翻译为MR程序，进行计算和分析！
+①环境配置
+	让hive持有可以读写hbase的jar包
+			在HIVE_HOME/lib/下，讲操作hbase的jar包以软连接的形式，持有！
+			
+②在hive中建表，这个表需要和hbase中的数据进行映射; 只能创建external non-native table
+	a) 数据已经在hbase中，只需要在hive建表，查询即可
+create external table hbase_t3(
+   id int,
+   age int,
+   gender string,
+   name string
+)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,info:age,info:gender,info:name")
+TBLPROPERTIES ("hbase.table.name" = "t3");
+
+	
+	
+	
+	
+	
+	b) 数据还尚未插入到hbase，可以在hive中建表，建表后，在hive中执行数据的导入
+		将数据导入到hbase，再分析。 表必须是managed non-native table！
+		①建表
+CREATE  TABLE `hbase_emp`(
+  `empno` int, 
+  `ename` string, 
+  `job` string, 
+  `mgr` int, 
+  `hiredate` string, 
+  `sal` double, 
+  `comm` double, 
+  `deptno` int)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,info:ename,info:job,info:mgr,
+info:hiredate,info:sal,info:comm,info:deptno")
+TBLPROPERTIES ("hbase.table.name" = "emp");
+		②替换hive-hbase-handler.jar
+		③使用insert向表中导入数据
+insert into table hbase_emp select * from emp
+			
+		
+④注意事项：
+		a)在建表时，hive中的表字段的类型要和hbase中表列的类型一致,以避免类型转换失败
+			造成数据丢失
+		b) row format 的作用是指定表在读取数据时，使用什么分隔符来切割数据，
+			只有正确的分隔符，才能正确切分字段
+		c) 管理表：managed_table
+					由hive的表管理数据的生命周期！在hive中，执行droptable时，
+					不禁将hive中表的元数据删除，还把表目录中的数据删除
+			外部表： external_table
+					hive表不负责数据的生命周期！在hive中，执行droptable时，
+					只会将hive中表的元数据删除，不把表目录中的数据删除
+					
+					
+二、hive集成hbase理论
+
+1.Storage Handlers
+		Storage Handlers是一个扩展模块，帮助hive分析不在hdfs存储的数据！
+		例如数据存储在hbase上，可以使用hive提供的对hbase的Storage Handlers，来读写hbase中的数据！
+		
+		
+		native table: 本地表！ hive无需通过Storage Handlers就能访问的表。
+				例如之前创建的表，都是native table！
+		non-native table : hive必须通过Storage Handlers才能访问的表！
+				例如和hbase继承的表！
+				
+2. 在建表时
+		创建native表：
+				[ROW FORMAT row_format] [STORED AS file_format]
+						file_format: ORC|TEXTFILE|SEQUNCEFILE|PARQUET
+						都是hive中支持的文件格式，由hive负责数据的读写！
+		或
+		创建non-native表:
+				STORED BY 'storage.handler.class.name' [WITH SERDEPROPERTIES (...)]
+						数据在外部存储，hive通过Storage Handlers来读写数据！
+						
+3. SERDE:
+		序列化器和反序列化器
+		
+		表中的数据是什么样的格式，就必须使用什么样的SerDe!
+			纯文本：  row format delimited ，默认使用LazySimpleSerDe
+			JSON格式：  使用JsonSerde
+			ORC：    使用读取ORC的SerDe
+			Paquet:  使用读取PaquetSerDe
+		
+		普通的文件数据，以及在建表时，如果不指定serde，默认使用LazySimpleSerDe！
+		
+例如： 数据中全部是JSON格式
+{"name":"songsong","friends":["bingbing","lili"]}
+{"name":"songsong1","friends": ["bingbing1" , "lili1"]}
+
+错误写法：
+create table testSerde(
+name string,
+friends array<string>
+)
+row format delimited fields terminated by ','
+collection items terminated by ','
+lines terminated by '\n';
+
+如果指定了row format delimited ,此时默认使用LazySimpleSerDe！
+LazySimpleSerDe只能处理有分隔符的普通文本！
+
+现在数据是JSON，格式{},只能用JSONSerDE
+create table testSerde2(
+name string,
+friends array<string>
+)
+ROW FORMAT SERDE 
+'org.apache.hive.hcatalog.data.JsonSerDe' 
+STORED AS TEXTFILE
+
+		
+		
