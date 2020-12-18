@@ -11,6 +11,6 @@ public class Client {
         State state = new ConcreteStateA();
         Context context = new Context();
         context.setState(state);
-        context.doAction("test");
+        context.doAction("deadlock");
     }
 }

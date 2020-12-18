@@ -18,7 +18,7 @@ public class ChessFlyWeightFactory {
     }
 
     /**
-     * test
+     *
      * @param args
      */
     public static void main(String[] args) {

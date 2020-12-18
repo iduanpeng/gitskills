@@ -19,6 +19,7 @@
         <module>thread</module>
         <module>shell</module>
         <module>bigdata</module>
+        <module>leetcode</module>
     </modules>
     <dependencyManagement>
     <dependencies>
