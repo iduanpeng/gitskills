@@ -1,4 +1,4 @@
-package com.iduanpeng.leetcode.huawei;
+package com.iduanpeng.huawei;
 
 import java.util.Scanner;
 

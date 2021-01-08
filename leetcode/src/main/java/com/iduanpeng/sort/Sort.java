@@ -1,4 +1,4 @@
-package com.iduanpeng.leetcode.sort;
+package com.iduanpeng.sort;
 
 /**
  * 排序算法
