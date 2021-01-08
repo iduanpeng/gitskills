@@ -1,6 +1,7 @@
 package com.iduanpeng.leetcode;
 
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -54,18 +55,26 @@ public class T2_StringMaxChildString {
      */
     public int lengthOfLongestSubString2(String s){
         int n = s.length();
-        Set<Character> set = new HashSet<>();
+        Set<Character> set = new LinkedHashSet<>();
         int ans = 0;
         int i = 0;
         int j = 0;
+        int start = 0;
+        int end = 0;
         while(i<n && j<n){
             if(!set.contains(s.charAt(j))){
                 set.add(s.charAt(j++));
+                //输出字符串的话 加此代码
+//                if (j-i > ans){
+//                    start = i;
+//                    end = j;
+//                }
                 ans = Math.max(ans,j -i);
             } else {
                 set.remove(s.charAt(i++));
             }
         }
+//        System.out.println(s.substring(start,end));
         return ans;
     }
 
