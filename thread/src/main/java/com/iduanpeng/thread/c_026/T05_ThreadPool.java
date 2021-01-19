@@ -13,7 +13,7 @@ public class T05_ThreadPool {
 		for (int i = 0; i < 6; i++) {
 			service.execute(() -> {
 				try {
-					TimeUnit.MILLISECONDS.sleep(500);
+					TimeUnit.MILLISECONDS.sleep(50000);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
