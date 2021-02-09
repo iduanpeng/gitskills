@@ -89,10 +89,40 @@ public class List2 {
 
     /**
      * 另外思路
+     * head
+     * -1  1    2  3  4   5  null
+     *          m
+     *          n
      */
+    ListNode reverseBetween2(ListNode head, int m, int n) {
+        if (head == null || m >= n) {
+            return head;
+        }
+        ListNode dummy = new ListNode(-1, head);
+        head = dummy;
+        for (int i = 1; i < m; i++) {
+            head = head.next;
+        }
+        ListNode preM = head;
+        ListNode mNode = head.next;
+        ListNode nNode = mNode;
+        ListNode postN = nNode.next;
+        for (int i = m; i < n; i++) {
+            ListNode next = postN.next;
+            //后驱节点反转  -1  1  2<-3  4  5
+            postN.next = nNode;
+            nNode = postN;
+            postN = next;
+            //第一次循环后
+            //-1   1     2     3    4     5
+            //dum  head  m     n    next
+            //     preM             postN
 
-
-
+        }
+        mNode.next = postN;
+        preM.next = nNode;
+        return dummy.next;
+    }
 
 
     public static class ListNode {
