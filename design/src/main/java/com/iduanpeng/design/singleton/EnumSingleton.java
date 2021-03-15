@@ -7,11 +7,11 @@ public class EnumSingleton {
         return SingletonEnum.INSTANCE.getInstance();
     }
 
-    static enum SingletonEnum{
+    enum SingletonEnum{
         INSTANCE,;
         private EnumSingleton enumSingleton;
 
-        private SingletonEnum(){
+        SingletonEnum(){
             enumSingleton = new EnumSingleton();
         }
 
